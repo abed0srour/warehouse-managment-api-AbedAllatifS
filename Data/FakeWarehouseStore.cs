@@ -149,6 +149,18 @@ namespace WarehouseManagement.Api.Data
             }
 
         }
+        public static List<Supplier> Suppliers { get; set; } = new List<Supplier>()
+        {
+            new Supplier 
+            { 
+                Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 
+                Name = "Supplier A", 
+                Country = "Lebanon", 
+                ContactEmail = "info@supplierA.com", 
+                PhoneNumber = "+9610123456", 
+                IsActive = true 
+            }
+        };
 
     }
 }
