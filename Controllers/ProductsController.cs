@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using WarehouseManagement.Api.Data;
 using WarehouseManagement.Api.Models;
 using WarehouseManagement.Api.Contracts;
+using WarehouseManagement.Api.Services;
 
 namespace WarehouseManagement.Api.Controllers
 {
@@ -17,25 +18,24 @@ namespace WarehouseManagement.Api.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly ILogger<ProductsController> _logger;
+        private readonly IProductService _productService;
+        private readonly ISupplierService _supplierService;
 
-        // Injecting the standard logger for Endpoint #6 (Audit Logs)
-        public ProductsController(ILLogger<ProductsController> logger)
+        public ProductsController(
+            ILogger<ProductsController> logger,
+            IProductService productService,
+            ISupplierService supplierService)
         {
             _logger = logger;
+            _productService = productService;
+            _supplierService = supplierService;
         }
 
         // 1. GET ALL PRODUCTS
         [HttpGet]
         public IActionResult GetProducts([FromQuery] bool onlyAvailable = false)
         {
-            var query = FakeWarehouseStore.Products.AsEnumerable();
-
-            if (onlyAvailable)
-            {
-                query = query.Where(p => p.QuantityInStock > 0);
-            }
-
-            var products = query.OrderByDescending(p => p.CreatedAt).ToList();
+            var products = _productService.GetAll(onlyAvailable).ToList();
             return Ok(products);
         }
 
@@ -43,7 +43,7 @@ namespace WarehouseManagement.Api.Controllers
         [HttpGet("{id:guid}")]
         public IActionResult GetProductById([FromRoute] Guid id)
         {
-            var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
+            var product = _productService.GetById(id);
             if (product == null)
             {
                 return NotFound();
@@ -56,54 +56,25 @@ namespace WarehouseManagement.Api.Controllers
         [HttpGet("search")]
         public IActionResult SearchProducts([FromQuery] string? name, [FromQuery] string? supplier)
         {
-            // Harder requirement: if both parameters empty -> return bad request
             if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(supplier))
             {
                 return BadRequest("At least one search parameter ('name' or 'supplier') must be provided.");
             }
 
-            var query = FakeWarehouseStore.Products.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                query = query.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(supplier))
-            {
-                query = query.Where(p => p.SupplierName.Contains(supplier, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return Ok(query.ToList());
+            var products = _productService.Search(name, supplier).ToList();
+            return Ok(products);
         }
 
         // 4. CREATE PRODUCT
         [HttpPost]
         public IActionResult CreateProduct([FromBody] CreateProductRequest request)
         {
-            // Harder requirement: prevent duplicate SKU using manual logic only
-            bool skuExists = FakeWarehouseStore.Products.Any(p => p.SKU.Equals(request.SKU, StringComparison.OrdinalIgnoreCase));
-            if (skuExists)
+            if (_productService.SkuExists(request.SKU))
             {
                 return BadRequest("A product with this SKU already exists.");
             }
 
-            var newProduct = new Product
-            {
-                Id = Guid.NewGuid(), 
-                Name = request.Name,
-                SKU = request.SKU,
-                Description = request.Description,
-                Price = request.Price,
-                QuantityInStock = request.QuantityInStock,
-                SupplierName = request.SupplierName,
-                ExpiryDate = request.ExpiryDate,
-                IsArchived = false,
-                CreatedAt = DateTime.UtcNow 
-            };
-
-            FakeWarehouseStore.Products.Add(newProduct);
-
+            var newProduct = _productService.Create(request);
             return CreatedAtAction(nameof(GetProductById), new { id = newProduct.Id }, newProduct);
         }
 
@@ -111,20 +82,15 @@ namespace WarehouseManagement.Api.Controllers
         [HttpPost("{id:guid}/quantity")]
         public IActionResult UpdateQuantity([FromRoute] Guid id, [FromBody] UpdateProductQuantityRequest request)
         {
-            var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-
-            // Rule: quantity cannot be negative
             if (request.QuantityInStock < 0)
             {
                 return BadRequest("Quantity cannot be negative.");
             }
 
-            product.QuantityInStock = request.QuantityInStock;
-            product.LastUpdatedAt = DateTime.UtcNow; // last updated date changes
+            if (!_productService.UpdateQuantity(id, request.QuantityInStock, out var product))
+            {
+                return NotFound();
+            }
 
             return Ok(product);
         }
@@ -133,25 +99,17 @@ namespace WarehouseManagement.Api.Controllers
         [HttpPost("{id:guid}/price")]
         public IActionResult UpdatePrice([FromRoute] Guid id, [FromBody] UpdateProductPriceRequest request)
         {
-            var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-
-            // Rule: price must be > 0
             if (request.Price <= 0)
             {
                 return BadRequest("Price must be greater than zero.");
             }
 
-            decimal oldPrice = product.Price;
-            product.Price = request.Price;
-            product.LastUpdatedAt = DateTime.UtcNow;
+            if (!_productService.UpdatePrice(id, request.Price, out var oldPrice, out var product))
+            {
+                return NotFound();
+            }
 
-            // Rule: audit old/new value in logs
             _logger.LogInformation("Product {ProductId} price updated. Old Price: {OldPrice}, New Price: {NewPrice}", id, oldPrice, request.Price);
-
             return Ok(product);
         }
 
@@ -159,7 +117,7 @@ namespace WarehouseManagement.Api.Controllers
         [HttpPost("{id:guid}/image")]
         public async Task<IActionResult> UploadImage([FromRoute] Guid id, [FromForm] IFormFile file)
         {
-            var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
+            var product = _productService.GetById(id);
             if (product == null)
             {
                 return NotFound();
@@ -170,20 +128,17 @@ namespace WarehouseManagement.Api.Controllers
                 return BadRequest("No file was uploaded.");
             }
 
-            // Requirement: max 2 MB (2 * 1024 * 1024 bytes)
             if (file.Length > 2 * 1024 * 1024)
             {
                 return BadRequest("File size exceeds the maximum limit of 2 MB.");
             }
 
-            // Requirement: only jpg/png
-            var extension = Path.GetExtension(file.FileName).ToLowerSuffix();
+            var extension = file.FileName.ToLowerSuffix();
             if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
             {
                 return BadRequest("Invalid image format. Only JPG, JPEG, and PNG are allowed.");
             }
 
-            // Requirement: save to wwwroot/uploads
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             if (!Directory.Exists(uploadsFolder))
             {
@@ -198,9 +153,14 @@ namespace WarehouseManagement.Api.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            // attach the web relative path back into the object if needed
-            product.LastUpdatedAt = DateTime.UtcNow;
+            FakeWarehouseStore.ProductImages.Add(new ProductImage
+            {
+                ProductId = id,
+                FileName = uniqueFileName,
+                FilePath = Path.Combine("uploads", uniqueFileName)
+            });
 
+            product.LastUpdatedAt = DateTime.UtcNow;
             return Ok(new { Message = "Image uploaded successfully", FileName = uniqueFileName });
         }
 
@@ -208,15 +168,10 @@ namespace WarehouseManagement.Api.Controllers
         [HttpDelete("{id:guid}")]
         public IActionResult SoftDeleteProduct([FromRoute] Guid id)
         {
-            var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
-            if (product == null)
+            if (!_productService.SoftDelete(id))
             {
                 return NotFound();
             }
-
-            // Harder requirement: Do soft delete only (set IsArchived = true, do not remove from list)
-            product.IsArchived = true;
-            product.LastUpdatedAt = DateTime.UtcNow;
 
             return NoContent();
         }
@@ -225,36 +180,69 @@ namespace WarehouseManagement.Api.Controllers
         [HttpGet("server-time")]
         public IActionResult GetServerTime([FromHeader(Name = "Accept-Language")] string? acceptLanguage)
         {
-            // Default culture fallback if header is empty or invalid
             var cultureInfo = new CultureInfo("en-US");
 
             if (!string.IsNullOrWhiteSpace(acceptLanguage))
             {
-                // Parse the first language token if a comma separated list is provided (e.g., 'en-US,en;q=0.9')
                 var primaryLanguage = acceptLanguage.Split(',')[0].Trim();
 
-                if (primaryLanguage.Equals("fr-FR", StringComparison.OrdinalIgnoreCase) || 
+                if (primaryLanguage.Equals("fr-FR", StringComparison.OrdinalIgnoreCase) ||
                     primaryLanguage.Equals("fr", StringComparison.OrdinalIgnoreCase))
                 {
                     cultureInfo = new CultureInfo("fr-FR");
                 }
-                else if (primaryLanguage.Equals("ar-LB", StringComparison.OrdinalIgnoreCase) || 
+                else if (primaryLanguage.Equals("ar-LB", StringComparison.OrdinalIgnoreCase) ||
                          primaryLanguage.Equals("ar", StringComparison.OrdinalIgnoreCase))
                 {
                     cultureInfo = new CultureInfo("ar-LB");
                 }
             }
 
-            // Format date string explicitly according to target language rules
             var formattedDate = DateTime.Now.ToString("F", cultureInfo);
-
             return Ok(new { ServerTime = formattedDate, CultureUsed = cultureInfo.Name });
+        }
+
+        [HttpPost("{id:guid}/assign-supplier/{supplierId:guid}")]
+        public IActionResult AssignSupplier([FromRoute] Guid id, [FromRoute] Guid supplierId)
+        {
+            var product = _productService.GetById(id);
+            if (product == null)
+            {
+                return NotFound($"Product with ID {id} was not found.");
+            }
+
+            if (product.IsArchived)
+            {
+                return BadRequest("Cannot assign a supplier to an archived product.");
+            }
+
+            var supplier = _supplierService.GetById(supplierId);
+            if (supplier == null)
+            {
+                return NotFound($"Supplier with ID {supplierId} was not found.");
+            }
+
+            _productService.AssignSupplier(id, supplier, out _);
+            return Ok(new
+            {
+                Message = "Supplier assigned successfully.",
+                ProductId = product.Id,
+                ProductName = product.Name,
+                AssignedSupplier = supplier.Name
+            });
         }
     }
 
-    // Quick helper extension method for string parsing
     public static class StringExtensions
     {
-        public static string ToLowerSuffix(this string value) => value?.ToLower(CultureInfo.InvariantCulture) ?? string.Empty;
+        public static string ToLowerSuffix(this string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            return Path.GetExtension(value).ToLower(CultureInfo.InvariantCulture);
+        }
     }
 }
