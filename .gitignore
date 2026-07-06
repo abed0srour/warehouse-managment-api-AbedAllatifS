@@ -1,0 +1,12 @@
+# Avoid tracking generated build outputs
+bin/
+obj/
+
+# Avoid tracking IDE specific configurations
+.idea/
+.vs/
+.vscode/
+*.user
+
+# Avoid tracking local application launch configurations
+Properties/launchSettings.json
