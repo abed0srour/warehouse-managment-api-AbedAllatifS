@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Application", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Infrastructure", "src\Warehouse.Infrastructure\Warehouse.Infrastructure.csproj", "{77E8D8FF-697E-47E2-A92F-1B3376D17417}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Presentation", "src\Warehouse.Presentation\Warehouse.Presentation.csproj", "{E48DE232-D28B-46DD-BC85-8D09A410F53B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Presentation", "src\src\Warehouse.Presentation_Temp\Warehouse.Presentation.csproj", "{E48DE232-D28B-46DD-BC85-8D09A410F53B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
