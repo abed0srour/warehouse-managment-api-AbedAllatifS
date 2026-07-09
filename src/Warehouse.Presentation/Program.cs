@@ -21,11 +21,24 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Warehouse API V1");
+        c.RoutePrefix = "swagger";
+    });
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.MapControllers();
+
+var urls = app.Urls.ToArray();
+var urlsText = string.Join(", ", urls);
+var swaggerUrl = urls.Length > 0
+    ? $"{urls[0]}/swagger"
+    : "http://localhost:5205/swagger";
+
+app.Logger.LogInformation("Swagger available at: {SwaggerUrl}", swaggerUrl);
+app.Logger.LogInformation("Application running on: {Urls}", urlsText);
 
 app.Run();

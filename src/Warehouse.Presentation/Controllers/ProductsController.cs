@@ -131,9 +131,9 @@ namespace WarehouseManagement.Api.Controllers
             }
         }
 
-        // 7. UPLOAD IMAGE
         [HttpPost("{id:guid}/image")]
-        public async Task<IActionResult> UploadImage([FromRoute] Guid id, [FromForm] IFormFile file)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage([FromRoute] Guid id, [FromForm] UploadImageRequest request)
         {
             var product = await _mediator.Send(new GetProductByIdQuery(id));
             if (product == null)
@@ -141,6 +141,7 @@ namespace WarehouseManagement.Api.Controllers
                 return NotFound();
             }
 
+            var file = request.File;
             if (file == null || file.Length == 0)
             {
                 return BadRequest("No file was uploaded.");
