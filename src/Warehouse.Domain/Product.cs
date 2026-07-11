@@ -17,6 +17,8 @@ public class Product
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastUpdatedAt { get; set; }
 
+    public virtual Supplier? Supplier { get; set; }
+
     public static Product Create(string name, string sku, decimal price, int quantity)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -43,7 +45,7 @@ public class Product
     public void UpdatePrice(decimal newPrice)
     {
         if (IsArchived)
-            throw new InvalidOperationException("Archived products cannot be updated."); // Rule: Block frozen edits
+            throw new InvalidOperationException("Archived products cannot be updated.");
 
         if (newPrice <= 0)
             throw new ArgumentException("Price must be greater than zero.");
@@ -55,7 +57,7 @@ public class Product
     public void UpdateQuantity(int newQuantity)
     {
         if (IsArchived)
-            throw new InvalidOperationException("Archived products cannot be updated."); // Rule: Block frozen edits
+            throw new InvalidOperationException("Archived products cannot be updated.");
 
         if (newQuantity < 0)
             throw new ArgumentException("Quantity cannot be negative.");
@@ -76,10 +78,11 @@ public class Product
             throw new InvalidOperationException("Archived products cannot be updated.");
 
         if (!supplier.IsActive)
-            throw new InvalidOperationException("Inactive suppliers cannot be assigned to products."); // Rule: Active supplier verification
+            throw new InvalidOperationException("Inactive suppliers cannot be assigned to products.");
 
         SupplierId = supplier.Id;
         SupplierName = supplier.Name;
+        Supplier = supplier; 
         LastUpdatedAt = DateTime.UtcNow;
     }
 }
