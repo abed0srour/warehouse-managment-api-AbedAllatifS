@@ -1,67 +1,52 @@
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Threading.Tasks;
-using Warehouse.Application.Suppliers.Commands;
-using Warehouse.Application.Suppliers.Queries;
-using WarehouseManagement.Api.Contracts;
+using Warehouse.Domain;
+using Warehouse.Infrastructure.Repositories;
 
-namespace WarehouseManagement.Api.Controllers
+namespace Warehouse.Presentation.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class SuppliersController : ControllerBase
 {
-    [ApiController]
-    [Route("api/suppliers")]
-    public class SuppliersController : ControllerBase
+    private readonly ISupplierRepository _supplierRepository;
+
+    public SuppliersController(ISupplierRepository supplierRepository)
     {
-        private readonly IMediator _mediator;
+        _supplierRepository = supplierRepository;
+    }
 
-        public SuppliersController(IMediator mediator)
-        {
-            _mediator = mediator;
-        }
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Supplier>>> GetAll()
+    {
+        var suppliers = await _supplierRepository.GetAllAsync();
+        return Ok(suppliers);
+    }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllSuppliers()
-        {
-            var suppliers = await _mediator.Send(new GetAllSuppliersQuery());
-            return Ok(suppliers);
-        }
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<Supplier>> GetById(Guid id)
+    {
+        var supplier = await _supplierRepository.GetByIdAsync(id);
+        if (supplier == null) return NotFound();
 
-        [HttpGet("{id:guid}")]
-        public async Task<IActionResult> GetSupplierById([FromRoute] Guid id)
-        {
-            var supplier = await _mediator.Send(new GetSupplierByIdQuery(id));
-            if (supplier == null)
-            {
-                return NotFound();
-            }
-            return Ok(supplier);
-        }
+        return Ok(supplier);
+    }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequest request)
-        {
-            try
-            {
-                var supplierId = await _mediator.Send(new CreateSupplierCommand(request.Name, request.Country, request.ContactEmail, request.PhoneNumber));
-                var createdSupplier = await _mediator.Send(new GetSupplierByIdQuery(supplierId));
-                return CreatedAtAction(nameof(GetSupplierById), new { id = supplierId }, createdSupplier);
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-        }
+    [HttpPost]
+    public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
+    {
+        await _supplierRepository.AddAsync(supplier);
+        return CreatedAtAction(nameof(GetById), new { id = supplier.Id }, supplier);
+    }
 
-        [HttpDelete("{id:guid}")]
-        public async Task<IActionResult> DeactivateSupplier([FromRoute] Guid id)
-        {
-            var wasDeactivated = await _mediator.Send(new DeactivateSupplierCommand(id));
-            if (!wasDeactivated)
-            {
-                return NotFound();
-            }
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] Supplier supplier)
+    {
+        if (id != supplier.Id) return BadRequest("ID mismatch");
 
-            return NoContent();
-        }
+        var existing = await _supplierRepository.GetByIdAsync(id);
+        if (existing == null) return NotFound();
+
+        await _supplierRepository.UpdateAsync(supplier);
+        return NoContent();
     }
 }
