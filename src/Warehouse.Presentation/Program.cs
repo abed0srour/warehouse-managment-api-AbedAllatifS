@@ -1,5 +1,7 @@
 using MediatR;
 using Scalar.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+using Warehouse.Infrastructure.Data;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Application.Suppliers.Commands;
@@ -16,7 +18,11 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Creat
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
+builder.Services.AddDbContext<WarehouseDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 var app = builder.Build();
+
 
 if (app.Environment.IsDevelopment())
 {
