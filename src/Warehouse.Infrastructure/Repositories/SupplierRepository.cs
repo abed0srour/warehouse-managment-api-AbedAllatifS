@@ -2,37 +2,40 @@ namespace Warehouse.Infrastructure.Repositories;
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Data;
 
 public class SupplierRepository : ISupplierRepository
 {
-    public Task<Supplier?> GetByIdAsync(Guid id)
+    private readonly WarehouseDbContext _context;
+
+    public SupplierRepository(WarehouseDbContext context)
     {
-        var supplier = FakeWarehouseStore.Suppliers.FirstOrDefault(s => s.Id == id);
-        return Task.FromResult(supplier);
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public Task<IEnumerable<Supplier>> GetAllAsync()
+    public async Task<Supplier?> GetByIdAsync(Guid id)
     {
-        return Task.FromResult<IEnumerable<Supplier>>(FakeWarehouseStore.Suppliers);
+        return await _context.Suppliers
+            .Include(s => s.Products) 
+            .FirstOrDefaultAsync(s => s.Id == id);
     }
 
-    public Task AddAsync(Supplier supplier)
+    public async Task<IEnumerable<Supplier>> GetAllAsync()
     {
-        FakeWarehouseStore.Suppliers.Add(supplier);
-        return Task.CompletedTask;
+        return await _context.Suppliers.ToListAsync();
     }
 
-    public Task UpdateAsync(Supplier supplier)
+    public async Task AddAsync(Supplier supplier)
     {
-        var index = FakeWarehouseStore.Suppliers.FindIndex(s => s.Id == supplier.Id);
-        if (index != -1)
-        {
-            FakeWarehouseStore.Suppliers[index] = supplier;
-        }
-        return Task.CompletedTask;
+        await _context.Suppliers.AddAsync(supplier);
+        await _context.SaveChangesAsync(); 
     }
-}
+
+    public async Task UpdateAsync(Supplier supplier)
+    {
+        _context.Suppliers.Update(supplier);
+        await _context.SaveChangesAsync(); 
+}}

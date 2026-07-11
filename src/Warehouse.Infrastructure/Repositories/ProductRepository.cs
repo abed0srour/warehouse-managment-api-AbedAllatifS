@@ -2,37 +2,41 @@ namespace Warehouse.Infrastructure.Repositories;
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Data;
 
 public class ProductRepository : IProductRepository
 {
-    public Task<Product?> GetByIdAsync(Guid id)
+    private readonly WarehouseDbContext _context;
+
+    public ProductRepository(WarehouseDbContext context)
     {
-        var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
-        return Task.FromResult(product);
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public Task<IEnumerable<Product>> GetAllAsync()
+    public async Task<Product?> GetByIdAsync(Guid id)
     {
-        return Task.FromResult<IEnumerable<Product>>(FakeWarehouseStore.Products);
+        return await _context.Products
+            .Include(p => p.Supplier) 
+            .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public Task AddAsync(Product product)
+    public async Task<IEnumerable<Product>> GetAllAsync()
     {
-        FakeWarehouseStore.Products.Add(product);
-        return Task.CompletedTask;
+        return await _context.Products.ToListAsync();
     }
 
-    public Task UpdateAsync(Product product)
+    public async Task AddAsync(Product product)
     {
-        var index = FakeWarehouseStore.Products.FindIndex(p => p.Id == product.Id);
-        if (index != -1)
-        {
-            FakeWarehouseStore.Products[index] = product;
-        }
-        return Task.CompletedTask;
+        await _context.Products.AddAsync(product);
+        await _context.SaveChangesAsync(); 
+    }
+
+    public async Task UpdateAsync(Product product)
+    {
+        _context.Products.Update(product);
+        await _context.SaveChangesAsync(); 
     }
 }
