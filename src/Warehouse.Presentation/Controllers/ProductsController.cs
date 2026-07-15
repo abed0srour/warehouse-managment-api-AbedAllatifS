@@ -1,15 +1,16 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using WarehouseManagement.Api.Data;
-using WarehouseManagement.Api.Models;
+using Warehouse.Application.Products.Commands;
+using Warehouse.Application.Products.Queries;
+using Warehouse.Domain;
 using WarehouseManagement.Api.Contracts;
-using WarehouseManagement.Api.Services;
 
 namespace WarehouseManagement.Api.Controllers
 {
@@ -18,32 +19,30 @@ namespace WarehouseManagement.Api.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly ILogger<ProductsController> _logger;
-        private readonly IProductService _productService;
-        private readonly ISupplierService _supplierService;
+        private readonly IMediator _mediator;
 
         public ProductsController(
             ILogger<ProductsController> logger,
-            IProductService productService,
-            ISupplierService supplierService)
+            IMediator mediator)
         {
             _logger = logger;
-            _productService = productService;
-            _supplierService = supplierService;
+            _mediator = mediator;
         }
 
         // 1. GET ALL PRODUCTS
         [HttpGet]
-        public IActionResult GetProducts([FromQuery] bool onlyAvailable = false)
+        public async Task<IActionResult> GetProducts([FromQuery] bool onlyAvailable = false)
         {
-            var products = _productService.GetAll(onlyAvailable).ToList();
-            return Ok(products);
+            var products = await _mediator.Send(new GetAllProductsQuery());
+            var filtered = onlyAvailable ? products.Where(p => p.QuantityInStock > 0).ToList() : products.ToList();
+            return Ok(filtered);
         }
 
         // 2. GET PRODUCT BY ID
         [HttpGet("{id:guid}")]
-        public IActionResult GetProductById([FromRoute] Guid id)
+        public async Task<IActionResult> GetProductById([FromRoute] Guid id)
         {
-            var product = _productService.GetById(id);
+            var product = await _mediator.Send(new GetProductByIdQuery(id));
             if (product == null)
             {
                 return NotFound();
@@ -54,75 +53,95 @@ namespace WarehouseManagement.Api.Controllers
 
         // 3. SEARCH PRODUCTS
         [HttpGet("search")]
-        public IActionResult SearchProducts([FromQuery] string? name, [FromQuery] string? supplier)
+        public async Task<IActionResult> SearchProducts([FromQuery] string? name, [FromQuery] string? supplier)
         {
             if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(supplier))
             {
                 return BadRequest("At least one search parameter ('name' or 'supplier') must be provided.");
             }
 
-            var products = _productService.Search(name, supplier).ToList();
-            return Ok(products);
+            var products = await _mediator.Send(new SearchProductsQuery(name, supplier));
+            return Ok(products.ToList());
         }
 
         // 4. CREATE PRODUCT
         [HttpPost]
-        public IActionResult CreateProduct([FromBody] CreateProductRequest request)
+        public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
         {
-            if (_productService.SkuExists(request.SKU))
+            try
             {
-                return BadRequest("A product with this SKU already exists.");
+                var productId = await _mediator.Send(new CreateProductCommand(request.Name, request.SKU, request.Description, request.Price, request.QuantityInStock, request.ExpiryDate));
+                var createdProduct = await _mediator.Send(new GetProductByIdQuery(productId));
+                return CreatedAtAction(nameof(GetProductById), new { id = productId }, createdProduct);
             }
-
-            var newProduct = _productService.Create(request);
-            return CreatedAtAction(nameof(GetProductById), new { id = newProduct.Id }, newProduct);
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         // 5. UPDATE QUANTITY
         [HttpPost("{id:guid}/quantity")]
-        public IActionResult UpdateQuantity([FromRoute] Guid id, [FromBody] UpdateProductQuantityRequest request)
+        public async Task<IActionResult> UpdateQuantity([FromRoute] Guid id, [FromBody] UpdateProductQuantityRequest request)
         {
-            if (request.QuantityInStock < 0)
+            try
             {
-                return BadRequest("Quantity cannot be negative.");
-            }
+                var success = await _mediator.Send(new UpdateProductQuantityCommand(id, request.QuantityInStock));
+                if (!success)
+                {
+                    return NotFound();
+                }
 
-            if (!_productService.UpdateQuantity(id, request.QuantityInStock, out var product))
+                var product = await _mediator.Send(new GetProductByIdQuery(id));
+                return Ok(product);
+            }
+            catch (ArgumentException ex)
             {
-                return NotFound();
+                return BadRequest(ex.Message);
             }
-
-            return Ok(product);
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         // 6. UPDATE PRICE
         [HttpPost("{id:guid}/price")]
-        public IActionResult UpdatePrice([FromRoute] Guid id, [FromBody] UpdateProductPriceRequest request)
+        public async Task<IActionResult> UpdatePrice([FromRoute] Guid id, [FromBody] UpdateProductPriceRequest request)
         {
-            if (request.Price <= 0)
+            try
             {
-                return BadRequest("Price must be greater than zero.");
-            }
+                var success = await _mediator.Send(new UpdateProductPriceCommand(id, request.Price));
+                if (!success)
+                {
+                    return NotFound();
+                }
 
-            if (!_productService.UpdatePrice(id, request.Price, out var oldPrice, out var product))
+                _logger.LogInformation("Product {ProductId} price updated. New Price: {NewPrice}", id, request.Price);
+                var product = await _mediator.Send(new GetProductByIdQuery(id));
+                return Ok(product);
+            }
+            catch (ArgumentException ex)
             {
-                return NotFound();
+                return BadRequest(ex.Message);
             }
-
-            _logger.LogInformation("Product {ProductId} price updated. Old Price: {OldPrice}, New Price: {NewPrice}", id, oldPrice, request.Price);
-            return Ok(product);
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        // 7. UPLOAD IMAGE
         [HttpPost("{id:guid}/image")]
-        public async Task<IActionResult> UploadImage([FromRoute] Guid id, [FromForm] IFormFile file)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage([FromRoute] Guid id, [FromForm] UploadImageRequest request)
         {
-            var product = _productService.GetById(id);
+            var product = await _mediator.Send(new GetProductByIdQuery(id));
             if (product == null)
             {
                 return NotFound();
             }
 
+            var file = request.File;
             if (file == null || file.Length == 0)
             {
                 return BadRequest("No file was uploaded.");
@@ -153,22 +172,16 @@ namespace WarehouseManagement.Api.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            FakeWarehouseStore.ProductImages.Add(new ProductImage
-            {
-                ProductId = id,
-                FileName = uniqueFileName,
-                FilePath = Path.Combine("uploads", uniqueFileName)
-            });
-
             product.LastUpdatedAt = DateTime.UtcNow;
             return Ok(new { Message = "Image uploaded successfully", FileName = uniqueFileName });
         }
 
         // 8. DELETE PRODUCT (SOFT DELETE)
         [HttpDelete("{id:guid}")]
-        public IActionResult SoftDeleteProduct([FromRoute] Guid id)
+        public async Task<IActionResult> SoftDeleteProduct([FromRoute] Guid id)
         {
-            if (!_productService.SoftDelete(id))
+            var success = await _mediator.Send(new ArchiveProductCommand(id));
+            if (!success)
             {
                 return NotFound();
             }
@@ -203,9 +216,9 @@ namespace WarehouseManagement.Api.Controllers
         }
 
         [HttpPost("{id:guid}/assign-supplier/{supplierId:guid}")]
-        public IActionResult AssignSupplier([FromRoute] Guid id, [FromRoute] Guid supplierId)
+        public async Task<IActionResult> AssignSupplier([FromRoute] Guid id, [FromRoute] Guid supplierId)
         {
-            var product = _productService.GetById(id);
+            var product = await _mediator.Send(new GetProductByIdQuery(id));
             if (product == null)
             {
                 return NotFound($"Product with ID {id} was not found.");
@@ -216,20 +229,26 @@ namespace WarehouseManagement.Api.Controllers
                 return BadRequest("Cannot assign a supplier to an archived product.");
             }
 
-            var supplier = _supplierService.GetById(supplierId);
-            if (supplier == null)
+            try
             {
-                return NotFound($"Supplier with ID {supplierId} was not found.");
-            }
+                var result = await _mediator.Send(new AssignSupplierCommand(id, supplierId));
+                if (!result.Success || result.Product == null)
+                {
+                    return NotFound($"Supplier with ID {supplierId} was not found.");
+                }
 
-            _productService.AssignSupplier(id, supplier, out _);
-            return Ok(new
+                return Ok(new
+                {
+                    Message = "Supplier assigned successfully.",
+                    ProductId = result.Product.Id,
+                    ProductName = result.Product.Name,
+                    AssignedSupplier = result.Product.SupplierName
+                });
+            }
+            catch (InvalidOperationException ex)
             {
-                Message = "Supplier assigned successfully.",
-                ProductId = product.Id,
-                ProductName = product.Name,
-                AssignedSupplier = supplier.Name
-            });
+                return BadRequest(ex.Message);
+            }
         }
     }
 

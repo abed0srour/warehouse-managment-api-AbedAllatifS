@@ -1,12 +1,18 @@
-# Avoid tracking generated build outputs
-bin/
-obj/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+*.exe
+*.deps.json
+*.runtimeconfig.json
 
-# Avoid tracking IDE specific configurations
-.idea/
 .vs/
 .vscode/
+*.suo
 *.user
-
-# Avoid tracking local application launch configurations
-Properties/launchSettings.json
+*.userosscache
+*.sln.docstates
+Thumbs.db
+Desktop.ini
