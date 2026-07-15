@@ -3,36 +3,74 @@ namespace Warehouse.Infrastructure.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Data;
+using EfSupplier = Warehouse.Infrastructure.Data.EfModels.Supplier;
+using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
 public class SupplierRepository : ISupplierRepository
 {
-    public Task<Supplier?> GetByIdAsync(Guid id)
+    private readonly WarehouseDbContext _context;
+
+    public SupplierRepository(WarehouseDbContext context)
     {
-        var supplier = FakeWarehouseStore.Suppliers.FirstOrDefault(s => s.Id == id);
-        return Task.FromResult(supplier);
+        _context = context;
     }
 
-    public Task<IEnumerable<Supplier>> GetAllAsync()
+    public async Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        return Task.FromResult<IEnumerable<Supplier>>(FakeWarehouseStore.Suppliers);
+        var entity = await _context.Suppliers.AsNoTracking().FirstOrDefaultAsync(s => s.SupplierId == id, cancellationToken);
+        return entity is null ? null : ToDomain(entity);
     }
 
-    public Task AddAsync(Supplier supplier)
+    public async Task<IEnumerable<Supplier>> GetAllAsync(CancellationToken cancellationToken)
     {
-        FakeWarehouseStore.Suppliers.Add(supplier);
-        return Task.CompletedTask;
+        var entities = await _context.Suppliers.AsNoTracking().ToListAsync(cancellationToken);
+        return entities.Select(ToDomain).ToList();
     }
 
-    public Task UpdateAsync(Supplier supplier)
+    public async Task AddAsync(Supplier supplier, CancellationToken cancellationToken)
     {
-        var index = FakeWarehouseStore.Suppliers.FindIndex(s => s.Id == supplier.Id);
-        if (index != -1)
+        _context.Suppliers.Add(ToEntity(supplier));
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(Supplier supplier, CancellationToken cancellationToken)
+    {
+        var entity = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierId == supplier.Id, cancellationToken);
+        if (entity is null)
         {
-            FakeWarehouseStore.Suppliers[index] = supplier;
+            return;
         }
-        return Task.CompletedTask;
+
+        entity.Name = supplier.Name;
+        entity.Country = supplier.Country;
+        entity.ContactEmail = supplier.ContactEmail;
+        entity.PhoneNumber = supplier.PhoneNumber;
+        entity.IsActive = supplier.IsActive;
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private static Supplier ToDomain(EfSupplier entity) => new()
+    {
+        Id = entity.SupplierId,
+        Name = entity.Name,
+        Country = entity.Country,
+        ContactEmail = entity.ContactEmail,
+        PhoneNumber = entity.PhoneNumber,
+        IsActive = entity.IsActive
+    };
+
+    private static EfSupplier ToEntity(Supplier supplier) => new()
+    {
+        SupplierId = supplier.Id,
+        Name = supplier.Name,
+        Country = supplier.Country,
+        ContactEmail = supplier.ContactEmail,
+        PhoneNumber = supplier.PhoneNumber,
+        IsActive = supplier.IsActive
+    };
 }
