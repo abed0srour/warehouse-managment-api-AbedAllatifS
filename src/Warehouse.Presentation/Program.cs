@@ -22,12 +22,14 @@ builder.Services.AddDbContext<WarehouseDbContext>(options =>
 // 2. Updated MediatR to scan BOTH Application and Infrastructure assemblies
 builder.Services.AddMediatR(cfg => 
 {
-    // Scans your Application layer (Commands / Queries)
     cfg.RegisterServicesFromAssembly(typeof(CreateProductCommand).Assembly);
     
-    // Scans your Infrastructure layer (For your new DB-first handlers)
     cfg.RegisterServicesFromAssembly(typeof(WarehouseDbContext).Assembly);
 });
+builder.Services.AddAutoMapper(
+    cfg => { },
+    typeof(Warehouse.Application.MappingProfile).Assembly,
+    typeof(Warehouse.Infrastructure.Mapping.EfMappingProfile).Assembly);
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();

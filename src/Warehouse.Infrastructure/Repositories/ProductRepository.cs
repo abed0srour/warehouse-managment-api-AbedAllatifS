@@ -3,36 +3,89 @@ namespace Warehouse.Infrastructure.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Data;
+using EfProduct = Warehouse.Infrastructure.Data.EfModels.Product;
+using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
 public class ProductRepository : IProductRepository
 {
-    public Task<Product?> GetByIdAsync(Guid id)
+    private readonly WarehouseDbContext _context;
+
+    public ProductRepository(WarehouseDbContext context)
     {
-        var product = FakeWarehouseStore.Products.FirstOrDefault(p => p.Id == id);
-        return Task.FromResult(product);
+        _context = context;
     }
 
-    public Task<IEnumerable<Product>> GetAllAsync()
+    public async Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        return Task.FromResult<IEnumerable<Product>>(FakeWarehouseStore.Products);
+        var entity = await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        return entity is null ? null : ToDomain(entity);
     }
 
-    public Task AddAsync(Product product)
+    public async Task<IEnumerable<Product>> GetAllAsync(CancellationToken cancellationToken)
     {
-        FakeWarehouseStore.Products.Add(product);
-        return Task.CompletedTask;
+        var entities = await _context.Products.AsNoTracking().ToListAsync(cancellationToken);
+        return entities.Select(ToDomain).ToList();
     }
 
-    public Task UpdateAsync(Product product)
+    public async Task AddAsync(Product product, CancellationToken cancellationToken)
     {
-        var index = FakeWarehouseStore.Products.FindIndex(p => p.Id == product.Id);
-        if (index != -1)
+        _context.Products.Add(ToEntity(product));
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(Product product, CancellationToken cancellationToken)
+    {
+        var entity = await _context.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken);
+        if (entity is null)
         {
-            FakeWarehouseStore.Products[index] = product;
+            return;
         }
-        return Task.CompletedTask;
+
+        entity.Name = product.Name;
+        entity.Sku = product.Sku;
+        entity.Description = product.Description;
+        entity.Price = product.Price;
+        entity.QuantityInStock = product.QuantityInStock;
+        entity.SupplierName = product.SupplierName;
+        entity.SupplierId = product.SupplierId;
+        entity.ExpiryDate = product.ExpiryDate;
+        entity.IsArchived = product.IsArchived;
+        entity.LastUpdatedAt = product.LastUpdatedAt ?? DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private static Product ToDomain(EfProduct entity) => Product.Reconstruct(
+        entity.Id,
+        entity.Name,
+        entity.Sku,
+        entity.Description ?? string.Empty,
+        entity.Price,
+        entity.QuantityInStock,
+        entity.SupplierName,
+        entity.SupplierId,
+        entity.ExpiryDate,
+        entity.IsArchived,
+        entity.CreatedAt,
+        entity.LastUpdatedAt);
+
+    private static EfProduct ToEntity(Product product) => new()
+    {
+        Id = product.Id,
+        Name = product.Name,
+        Sku = product.Sku,
+        Description = product.Description,
+        Price = product.Price,
+        QuantityInStock = product.QuantityInStock,
+        SupplierName = product.SupplierName,
+        SupplierId = product.SupplierId,
+        ExpiryDate = product.ExpiryDate,
+        IsArchived = product.IsArchived,
+        CreatedAt = product.CreatedAt,
+        LastUpdatedAt = product.LastUpdatedAt ?? product.CreatedAt
+    };
 }

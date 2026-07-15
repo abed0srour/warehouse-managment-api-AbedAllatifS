@@ -1,37 +1,50 @@
 namespace Warehouse.Application.Products.Commands;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common;
 using Warehouse.Domain;
 
 public record CreateProductCommand(
-    string Name, 
-    string Sku, 
-    string Description, 
-    decimal Price, 
-    int QuantityInStock, 
+    string Name,
+    string Sku,
+    string Description,
+    decimal Price,
+    int QuantityInStock,
     DateTime? ExpiryDate
-) : IRequest<Guid>;
+) : IRequest<Result<ProductViewModel>>;
 
-public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Guid>
+public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductViewModel>>
 {
     private readonly IProductRepository _productRepository;
+    private readonly IMapper _mapper;
 
-    public CreateProductCommandHandler(IProductRepository productRepository)
+    public CreateProductCommandHandler(IProductRepository productRepository, IMapper mapper)
     {
         _productRepository = productRepository;
+        _mapper = mapper;
     }
 
-    public async Task<Guid> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    public async Task<Result<ProductViewModel>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
-        // Enforce domain validation rules on creation
-        var product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
+        Product product;
+        try
+        {
+            // Enforce domain validation rules on creation
+            product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
+        }
+        catch (ArgumentException ex)
+        {
+            return Result.Failure<ProductViewModel>(ErrorType.Validation, ex.Message);
+        }
+
         product.Description = request.Description;
         product.ExpiryDate = request.ExpiryDate;
 
-        await _productRepository.AddAsync(product);
-        return product.Id;
+        await _productRepository.AddAsync(product, cancellationToken);
+        return Result.Success(_mapper.Map<ProductViewModel>(product));
     }
 }
