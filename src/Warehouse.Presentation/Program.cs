@@ -6,7 +6,9 @@ using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Application.Suppliers.Commands;
 using Warehouse.Application.Suppliers.Queries;
+using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
+
 using Warehouse.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +38,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.MapControllers();
 
 var urls = app.Urls.ToArray();
