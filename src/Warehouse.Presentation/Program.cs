@@ -8,6 +8,7 @@ using Warehouse.Application.Suppliers.Commands;
 using Warehouse.Application.Suppliers.Queries;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
+using Warehouse.Presentation.Filters;
 
 using Warehouse.Infrastructure.Repositories;
 
@@ -22,6 +23,10 @@ builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
 builder.Services.AddDbContext<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ActionLoggingFilter>();
+});
 
 var app = builder.Build();
 
@@ -35,7 +40,10 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger";
     });
 }
-
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestTimingMiddleware>();
+app.UseHttpsRedirection();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseMiddleware<ExceptionHandlingMiddleware>();

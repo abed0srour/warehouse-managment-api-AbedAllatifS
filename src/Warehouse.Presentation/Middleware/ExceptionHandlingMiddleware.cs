@@ -48,7 +48,7 @@ namespace Warehouse.Presentation.Middleware
             {
                 ErrorCode = errorCode,
                 Message = message,
-                TraceId = context.TraceIdentifier
+                TraceId = context.Items.TryGetValue("CorrelationId", out var cid) ? cid?.ToString() ?? context.TraceIdentifier : context.TraceIdentifier
             };
 
             context.Response.ContentType = "application/json";
