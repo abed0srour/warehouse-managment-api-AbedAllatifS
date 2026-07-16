@@ -215,7 +215,8 @@ public class ProductsController : ControllerBase
 
     // 7. POST /api/products/{id}/image
     [HttpPost("{id:guid}/image")]
-    public async Task<IActionResult> UploadImage(Guid id, [FromForm] IFormFile file)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
     {
         var product = await _productRepository.GetByIdAsync(id);
         if (product == null)
