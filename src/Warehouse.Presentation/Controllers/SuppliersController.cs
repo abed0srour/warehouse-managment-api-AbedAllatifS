@@ -15,6 +15,7 @@ public class SuppliersController : ControllerBase
         _supplierRepository = supplierRepository;
     }
 
+    // GET /api/suppliers
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Supplier>>> GetAll()
     {
@@ -22,31 +23,45 @@ public class SuppliersController : ControllerBase
         return Ok(suppliers);
     }
 
+    // GET /api/suppliers/{id}
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Supplier>> GetById(Guid id)
     {
         var supplier = await _supplierRepository.GetByIdAsync(id);
-        if (supplier == null) return NotFound();
+        if (supplier == null)
+        {
+            return NotFound(new { message = $"Supplier with ID {id} was not found." });
+        }
 
         return Ok(supplier);
     }
 
+    // POST /api/suppliers
     [HttpPost]
     public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
     {
+        supplier.Id = Guid.NewGuid();
+        supplier.IsActive = true;
+
         await _supplierRepository.AddAsync(supplier);
+
         return CreatedAtAction(nameof(GetById), new { id = supplier.Id }, supplier);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] Supplier supplier)
+    // DELETE /api/suppliers/{id} - deactivate, not remove
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Deactivate(Guid id)
     {
-        if (id != supplier.Id) return BadRequest("ID mismatch");
+        var supplier = await _supplierRepository.GetByIdAsync(id);
+        if (supplier == null)
+        {
+            return NotFound(new { message = $"Supplier with ID {id} was not found." });
+        }
 
-        var existing = await _supplierRepository.GetByIdAsync(id);
-        if (existing == null) return NotFound();
+        supplier.IsActive = false;
 
         await _supplierRepository.UpdateAsync(supplier);
+
         return NoContent();
     }
 }
