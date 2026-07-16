@@ -9,12 +9,14 @@ using Warehouse.Application.Suppliers.Queries;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
 using Warehouse.Presentation.Filters;
-
 using Warehouse.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ActionLoggingFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateProductCommand).Assembly));
@@ -23,13 +25,11 @@ builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
 builder.Services.AddDbContext<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-    builder.Services.AddControllers(options =>
-{
-    options.Filters.Add<ActionLoggingFilter>();
-});
+
+builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
-
 
 if (app.Environment.IsDevelopment())
 {
@@ -40,13 +40,13 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger";
     });
 }
+
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestTimingMiddleware>();
-app.UseHttpsRedirection();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.MapControllers();
 
 var urls = app.Urls.ToArray();
