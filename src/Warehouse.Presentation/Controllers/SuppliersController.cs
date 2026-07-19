@@ -1,6 +1,9 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Warehouse.Application.Suppliers.Commands;
+using Warehouse.Application.Suppliers.Queries;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Repositories;
+using WarehouseManagement.Api.Contracts;
 
 namespace Warehouse.Presentation.Controllers;
 
@@ -8,26 +11,26 @@ namespace Warehouse.Presentation.Controllers;
 [Route("api/[controller]")]
 public class SuppliersController : ControllerBase
 {
-    private readonly ISupplierRepository _supplierRepository;
+    private readonly IMediator _mediator;
 
-    public SuppliersController(ISupplierRepository supplierRepository)
+    public SuppliersController(IMediator mediator)
     {
-        _supplierRepository = supplierRepository;
+        _mediator = mediator;
     }
 
     // GET /api/suppliers
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Supplier>>> GetAll()
+    public async Task<ActionResult<IEnumerable<Supplier>>> GetAll(CancellationToken cancellationToken)
     {
-        var suppliers = await _supplierRepository.GetAllAsync();
+        var suppliers = await _mediator.Send(new GetAllSuppliersQuery(), cancellationToken);
         return Ok(suppliers);
     }
 
     // GET /api/suppliers/{id}
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<Supplier>> GetById(Guid id)
+    public async Task<ActionResult<Supplier>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var supplier = await _supplierRepository.GetByIdAsync(id);
+        var supplier = await _mediator.Send(new GetSupplierByIdQuery(id), cancellationToken);
         if (supplier == null)
         {
             return NotFound(new { message = $"Supplier with ID {id} was not found." });
@@ -38,29 +41,26 @@ public class SuppliersController : ControllerBase
 
     // POST /api/suppliers
     [HttpPost]
-    public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
+    public async Task<ActionResult<Supplier>> Create([FromBody] CreateSupplierRequest request, CancellationToken cancellationToken)
     {
-        supplier.Id = Guid.NewGuid();
-        supplier.IsActive = true;
-
-        await _supplierRepository.AddAsync(supplier);
+        var supplier = await _mediator.Send(new CreateSupplierCommand(
+            request.Name,
+            request.Country,
+            request.ContactEmail,
+            request.PhoneNumber), cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id = supplier.Id }, supplier);
     }
 
     // DELETE /api/suppliers/{id} - deactivate, not remove
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Deactivate(Guid id)
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
     {
-        var supplier = await _supplierRepository.GetByIdAsync(id);
-        if (supplier == null)
+        var deactivated = await _mediator.Send(new DeactivateSupplierCommand(id), cancellationToken);
+        if (!deactivated)
         {
             return NotFound(new { message = $"Supplier with ID {id} was not found." });
         }
-
-        supplier.IsActive = false;
-
-        await _supplierRepository.UpdateAsync(supplier);
 
         return NoContent();
     }

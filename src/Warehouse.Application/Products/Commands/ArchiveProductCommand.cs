@@ -19,11 +19,11 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
 
     public async Task<bool> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(request.Id);
+        var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
         if (product == null) return false;
 
         product.Archive();
-        await _productRepository.UpdateAsync(product);
+        await _productRepository.UpdateAsync(product, cancellationToken);
         return true;
     }
 }

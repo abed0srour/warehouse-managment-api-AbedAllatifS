@@ -6,9 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 
-public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<bool>;
+public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<Product?>;
 
-public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProductQuantityCommand, bool>
+public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProductQuantityCommand, Product?>
 {
     private readonly IProductRepository _productRepository;
 
@@ -17,13 +17,13 @@ public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProduct
         _productRepository = productRepository;
     }
 
-    public async Task<bool> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)
+    public async Task<Product?> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(request.Id);
-        if (product == null) return false;
+        var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
+        if (product == null) return null;
 
         product.UpdateQuantity(request.NewQuantity);
-        await _productRepository.UpdateAsync(product);
-        return true;
+        await _productRepository.UpdateAsync(product, cancellationToken);
+        return product;
     }
 }

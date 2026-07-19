@@ -1,76 +1,41 @@
 using System.Globalization;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Warehouse.Application.Products.Commands;
+using Warehouse.Application.Products.Queries;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Repositories;
+using WarehouseManagement.Api.Contracts;
 
 namespace Warehouse.Presentation.Controllers;
-
-public class CreateProductRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public string Sku { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public decimal Price { get; set; }
-    public int QuantityInStock { get; set; }
-    public string? SupplierName { get; set; }
-    public DateTime? ExpiryDate { get; set; }
-}
-
-public class UpdateQuantityRequest
-{
-    public int QuantityInStock { get; set; }
-}
-
-public class UpdatePriceRequest
-{
-    public decimal Price { get; set; }
-}
 
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
-    private readonly IProductRepository _productRepository;
-    private readonly ISupplierRepository _supplierRepository;
-    private readonly ILogger<ProductsController> _logger;
+    private readonly IMediator _mediator;
 
-    private const long MaxImageSizeBytes = 2 * 1024 * 1024; // 2 MB
+    private const long MaxImageSizeBytes = 2 * 1024 * 1024;
     private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png" };
 
-    public ProductsController(
-        IProductRepository productRepository,
-        ISupplierRepository supplierRepository,
-        ILogger<ProductsController> logger)
+    public ProductsController(IMediator mediator)
     {
-        _productRepository = productRepository;
-        _supplierRepository = supplierRepository;
-        _logger = logger;
+        _mediator = mediator;
     }
 
     // 1. GET /api/products
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetAll([FromQuery] bool onlyAvailable = false)
+    public async Task<ActionResult<IEnumerable<Product>>> GetAll([FromQuery] bool onlyAvailable = false, CancellationToken cancellationToken = default)
     {
-        var products = await _productRepository.GetAllAsync();
-
-        var query = products.AsEnumerable();
-
-        if (onlyAvailable)
-        {
-            query = query.Where(p => !p.IsArchived && p.QuantityInStock > 0);
-        }
-
-        var result = query.OrderByDescending(p => p.CreatedAt).ToList();
-
-        return Ok(result);
+        var products = await _mediator.Send(new GetAllProductsQuery(onlyAvailable), cancellationToken);
+        return Ok(products);
     }
 
     // 2. GET /api/products/{id}
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<Product>> GetById(Guid id)
+    public async Task<ActionResult<Product>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(id);
+        var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
             return NotFound(new { message = $"Product with ID {id} was not found." });
@@ -83,82 +48,49 @@ public class ProductsController : ControllerBase
     [HttpGet("search")]
     public async Task<ActionResult<IEnumerable<Product>>> Search(
         [FromQuery] string? name,
-        [FromQuery] string? supplier)
+        [FromQuery] string? supplier, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(supplier))
         {
             return BadRequest(new { message = "At least one of 'name' or 'supplier' must be provided." });
         }
 
-        var products = await _productRepository.GetAllAsync();
-
-        var query = products.AsEnumerable();
-
-        if (!string.IsNullOrWhiteSpace(name))
-        {
-            query = query.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (!string.IsNullOrWhiteSpace(supplier))
-        {
-            query = query.Where(p =>
-                p.SupplierName != null &&
-                p.SupplierName.Contains(supplier, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Ok(query.ToList());
+        var products = await _mediator.Send(new SearchProductsQuery(name, supplier), cancellationToken);
+        return Ok(products);
     }
 
     // 4. POST /api/products
     [HttpPost]
-    public async Task<ActionResult<Product>> Create([FromBody] CreateProductRequest request)
+    public async Task<ActionResult<Product>> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
-        var existingProducts = await _productRepository.GetAllAsync();
-        var duplicateSku = existingProducts.Any(p =>
-            string.Equals(p.Sku, request.Sku, StringComparison.OrdinalIgnoreCase));
-
-        if (duplicateSku)
-        {
-            return Conflict(new { message = $"A product with SKU '{request.Sku}' already exists." });
-        }
-
         Product product;
         try
         {
-            product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
+            product = await _mediator.Send(new CreateProductCommand(
+                request.Name,
+                request.SKU,
+                request.Description,
+                request.Price,
+                request.QuantityInStock,
+                request.SupplierName,
+                request.ExpiryDate), cancellationToken);
         }
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
-
-        product.Description = request.Description;
-        product.SupplierName = request.SupplierName;
-        product.ExpiryDate = request.ExpiryDate;
-
-        await _productRepository.AddAsync(product);
 
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
     }
 
     // 5. POST /api/products/{id}/quantity
     [HttpPost("{id:guid}/quantity")]
-    public async Task<IActionResult> UpdateQuantity(Guid id, [FromBody] UpdateQuantityRequest request)
+    public async Task<IActionResult> UpdateQuantity(Guid id, [FromBody] UpdateProductQuantityRequest request, CancellationToken cancellationToken)
     {
-        if (request.QuantityInStock < 0)
-        {
-            return BadRequest(new { message = "Quantity cannot be negative." });
-        }
-
-        var product = await _productRepository.GetByIdAsync(id);
-        if (product == null)
-        {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
-        }
-
+        Product? product;
         try
         {
-            product.UpdateQuantity(request.QuantityInStock);
+            product = await _mediator.Send(new UpdateProductQuantityCommand(id, request.QuantityInStock), cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
@@ -169,31 +101,22 @@ public class ProductsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
-        await _productRepository.UpdateAsync(product);
+        if (product == null)
+        {
+            return NotFound(new { message = $"Product with ID {id} was not found." });
+        }
 
         return Ok(product);
     }
 
     // 6. POST /api/products/{id}/price
     [HttpPost("{id:guid}/price")]
-    public async Task<IActionResult> UpdatePrice(Guid id, [FromBody] UpdatePriceRequest request)
+    public async Task<IActionResult> UpdatePrice(Guid id, [FromBody] UpdateProductPriceRequest request, CancellationToken cancellationToken)
     {
-        if (request.Price <= 0)
-        {
-            return BadRequest(new { message = "Price must be greater than zero." });
-        }
-
-        var product = await _productRepository.GetByIdAsync(id);
-        if (product == null)
-        {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
-        }
-
-        var oldPrice = product.Price;
-
+        Product? product;
         try
         {
-            product.UpdatePrice(request.Price);
+            product = await _mediator.Send(new UpdateProductPriceCommand(id, request.Price), cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
@@ -204,11 +127,10 @@ public class ProductsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
-        await _productRepository.UpdateAsync(product);
-
-        _logger.LogInformation(
-            "Product {ProductId} price changed from {OldPrice} to {NewPrice}",
-            id, oldPrice, request.Price);
+        if (product == null)
+        {
+            return NotFound(new { message = $"Product with ID {id} was not found." });
+        }
 
         return Ok(product);
     }
@@ -216,9 +138,9 @@ public class ProductsController : ControllerBase
     // 7. POST /api/products/{id}/image
     [HttpPost("{id:guid}/image")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
+    public async Task<IActionResult> UploadImage(Guid id, IFormFile file, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(id);
+        var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
             return NotFound(new { message = $"Product with ID {id} was not found." });
@@ -248,7 +170,7 @@ public class ProductsController : ControllerBase
 
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
-            await file.CopyToAsync(stream);
+            await file.CopyToAsync(stream, cancellationToken);
         }
 
         return Ok(new { message = "Image uploaded successfully.", path = $"/uploads/{fileName}" });
@@ -256,17 +178,13 @@ public class ProductsController : ControllerBase
 
     // 8. DELETE /api/products/{id} - soft delete
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(id);
-        if (product == null)
+        var archived = await _mediator.Send(new ArchiveProductCommand(id), cancellationToken);
+        if (!archived)
         {
             return NotFound(new { message = $"Product with ID {id} was not found." });
         }
-
-        product.Archive();
-
-        await _productRepository.UpdateAsync(product);
 
         return NoContent();
     }
@@ -290,30 +208,17 @@ public class ProductsController : ControllerBase
 
     // Task 2 — POST /api/products/{id}/assign-supplier/{supplierId}
     [HttpPost("{id:guid}/assign-supplier/{supplierId:guid}")]
-    public async Task<IActionResult> AssignSupplier(Guid id, Guid supplierId)
+    public async Task<IActionResult> AssignSupplier(Guid id, Guid supplierId, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(id);
-        if (product == null)
-        {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
-        }
-
-        var supplier = await _supplierRepository.GetByIdAsync(supplierId);
-        if (supplier == null)
-        {
-            return NotFound(new { message = $"Supplier with ID {supplierId} was not found." });
-        }
-
+        Product product;
         try
         {
-            product.AssignSupplier(supplier);
+            product = await _mediator.Send(new AssignSupplierCommand(id, supplierId), cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
             return Conflict(new { message = ex.Message });
         }
-
-        await _productRepository.UpdateAsync(product);
 
         return Ok(product);
     }

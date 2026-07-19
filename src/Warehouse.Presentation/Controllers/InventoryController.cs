@@ -1,6 +1,6 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Warehouse.Infrastructure.Data;
+using Warehouse.Application.Inventory.Queries;
 
 namespace Warehouse.Presentation.Controllers;
 
@@ -8,50 +8,17 @@ namespace Warehouse.Presentation.Controllers;
 [Route("api/inventory")]
 public class InventoryController : ControllerBase
 {
-    private readonly IDbContextFactory<WarehouseDbContext> _contextFactory;
+    private readonly IMediator _mediator;
 
-    public InventoryController(IDbContextFactory<WarehouseDbContext> contextFactory)
+    public InventoryController(IMediator mediator)
     {
-        _contextFactory = contextFactory;
+        _mediator = mediator;
     }
 
     [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard()
+    public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
-       
-        var productStatsTask = GetProductStatsAsync();
-        var supplierCountTask = GetSupplierCountAsync();
-
-        await Task.WhenAll(productStatsTask, supplierCountTask);
-
-        var productStats = await productStatsTask;
-        var supplierCount = await supplierCountTask;
-
-        return Ok(new
-        {
-            TotalProducts = productStats.Total,
-            LowStockProducts = productStats.LowStock,
-            TotalSuppliers = supplierCount
-        });
-    }
-
-    private async Task<(int Total, List<object> LowStock)> GetProductStatsAsync()
-    {
-        await using var context = await _contextFactory.CreateDbContextAsync();
-
-        var total = await context.Products.CountAsync();
-
-        var lowStock = await context.Products
-            .Where(p => !p.IsArchived && p.QuantityInStock < 10)
-            .Select(p => new { p.Id, p.Name, p.QuantityInStock })
-            .ToListAsync();
-
-        return (total, lowStock.Cast<object>().ToList());
-    }
-
-    private async Task<int> GetSupplierCountAsync()
-    {
-        await using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.Suppliers.CountAsync();
+        var dashboard = await _mediator.Send(new GetInventoryDashboardQuery(), cancellationToken);
+        return Ok(dashboard);
     }
 }

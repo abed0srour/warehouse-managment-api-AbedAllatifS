@@ -19,6 +19,6 @@ public class GetAllSuppliersQueryHandler : IRequestHandler<GetAllSuppliersQuery,
 
     public async Task<IEnumerable<Supplier>> Handle(GetAllSuppliersQuery request, CancellationToken cancellationToken)
     {
-        return await _supplierRepository.GetAllAsync();
+        return await _supplierRepository.GetAllAsync(cancellationToken);
     }
 }

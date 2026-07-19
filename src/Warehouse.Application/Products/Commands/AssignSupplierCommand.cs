@@ -4,11 +4,12 @@ using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common.Exceptions;
 using Warehouse.Domain;
 
-public record AssignSupplierCommand(Guid ProductId, Guid SupplierId) : IRequest<(bool Success, Product? Product)>;
+public record AssignSupplierCommand(Guid ProductId, Guid SupplierId) : IRequest<Product>;
 
-public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierCommand, (bool Success, Product? Product)>
+public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierCommand, Product>
 {
     private readonly IProductRepository _productRepository;
     private readonly ISupplierRepository _supplierRepository;
@@ -19,17 +20,23 @@ public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierComman
         _supplierRepository = supplierRepository;
     }
 
-    public async Task<(bool Success, Product? Product)> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)
+    public async Task<Product> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)
     {
-        var product = await _productRepository.GetByIdAsync(request.ProductId);
-        if (product == null) return (false, null);
+        var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
+        if (product == null)
+        {
+            throw new NotFoundException($"Product with ID {request.ProductId} was not found.");
+        }
 
-        var supplier = await _supplierRepository.GetByIdAsync(request.SupplierId);
-        if (supplier == null) return (false, null);
+        var supplier = await _supplierRepository.GetByIdAsync(request.SupplierId, cancellationToken);
+        if (supplier == null)
+        {
+            throw new NotFoundException($"Supplier with ID {request.SupplierId} was not found.");
+        }
 
         product.AssignSupplier(supplier);
-        await _productRepository.UpdateAsync(product);
+        await _productRepository.UpdateAsync(product, cancellationToken);
 
-        return (true, product);
+        return product;
     }
 }

@@ -6,9 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 
-public record CreateSupplierCommand(string Name, string Country, string ContactEmail, string PhoneNumber) : IRequest<Guid>;
+public record CreateSupplierCommand(string Name, string Country, string ContactEmail, string PhoneNumber) : IRequest<Supplier>;
 
-public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Guid>
+public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Supplier>
 {
     private readonly ISupplierRepository _supplierRepository;
 
@@ -17,7 +17,7 @@ public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierComman
         _supplierRepository = supplierRepository;
     }
 
-    public async Task<Guid> Handle(CreateSupplierCommand request, CancellationToken cancellationToken)
+    public async Task<Supplier> Handle(CreateSupplierCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
@@ -27,10 +27,13 @@ public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierComman
         var supplier = new Supplier
         {
             Name = request.Name,
+            Country = request.Country,
+            ContactEmail = request.ContactEmail,
+            PhoneNumber = request.PhoneNumber,
             IsActive = true
         };
 
-        await _supplierRepository.AddAsync(supplier);
-        return supplier.Id;
+        await _supplierRepository.AddAsync(supplier, cancellationToken);
+        return supplier;
     }
 }

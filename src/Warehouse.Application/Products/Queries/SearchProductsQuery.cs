@@ -21,7 +21,7 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, I
 
     public async Task<IEnumerable<Product>> Handle(SearchProductsQuery request, CancellationToken cancellationToken)
     {
-        var products = await _productRepository.GetAllAsync();
+        var products = await _productRepository.GetAllAsync(cancellationToken);
         var query = products.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(request.Name))

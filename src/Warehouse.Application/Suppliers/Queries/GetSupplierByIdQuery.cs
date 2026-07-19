@@ -19,6 +19,6 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
 
     public async Task<Supplier?> Handle(GetSupplierByIdQuery request, CancellationToken cancellationToken)
     {
-        return await _supplierRepository.GetByIdAsync(request.Id);
+        return await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
     }
 }

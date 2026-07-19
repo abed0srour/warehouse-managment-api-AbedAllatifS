@@ -19,11 +19,11 @@ public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSuppli
 
     public async Task<bool> Handle(DeactivateSupplierCommand request, CancellationToken cancellationToken)
     {
-        var supplier = await _supplierRepository.GetByIdAsync(request.Id);
+        var supplier = await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
         if (supplier == null) return false;
 
         supplier.IsActive = false;
-        await _supplierRepository.UpdateAsync(supplier);
+        await _supplierRepository.UpdateAsync(supplier, cancellationToken);
         return true;
     }
 }
