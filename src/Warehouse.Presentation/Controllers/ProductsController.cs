@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Warehouse.Application.Common;
 using Warehouse.Application.Products;
+using Microsoft.Extensions.Localization;
+using Warehouse.Application.Resources;
 using Warehouse.Domain;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
@@ -16,13 +18,16 @@ namespace Warehouse.Presentation.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IStringLocalizer<SharedResources> _localizer;
+
 
     private const long MaxImageSizeBytes = 2 * 1024 * 1024;
     private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png" };
 
-    public ProductsController(IMediator mediator)
+    public ProductsController(IMediator mediator, IStringLocalizer<SharedResources> localizer)
     {
-        _mediator = mediator;
+      _mediator = mediator;
+      _localizer = localizer;
     }
 
     // 1. GET /api/products
@@ -40,8 +45,7 @@ public class ProductsController : ControllerBase
         var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
-        }
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });        }
 
         return Ok(product);
     }
@@ -105,7 +109,7 @@ public class ProductsController : ControllerBase
 
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
 
         return Ok(product);
@@ -131,7 +135,7 @@ public class ProductsController : ControllerBase
 
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
 
         return Ok(product);
@@ -145,7 +149,7 @@ public class ProductsController : ControllerBase
         var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
 
         if (file == null || file.Length == 0)

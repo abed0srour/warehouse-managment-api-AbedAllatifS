@@ -1,15 +1,11 @@
-using MediatR;
-using Microsoft.EntityFrameworkCore; // Added for EF Core
-using Scalar.AspNetCore;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore; 
 using Warehouse.Infrastructure.Data;
 using Warehouse.Application.Products.Commands;
-using Warehouse.Application.Products.Queries;
-using Warehouse.Application.Suppliers.Commands;
-using Warehouse.Application.Suppliers.Queries;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
+using Warehouse.Presentation.Filters;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
-using Warehouse.Presentation.Filters;
 using Warehouse.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,8 +15,10 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<ActionLoggingFilter>();
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
+builder.Services.AddSwaggerGen(c =>
+{
+    c.OperationFilter<AcceptLanguageHeaderFilter>();
+});
 // 1. Register your Docker PostgreSQL Database Context
 builder.Services.AddDbContext<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -45,7 +43,24 @@ builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
 
 builder.Services.AddScoped<WarehouseDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<WarehouseDbContext>>().CreateDbContext());
+builder.Services.AddLocalization();
+var supportedCultures = new[] { "en", "fr" };
 
+var localizationOptions = new RequestLocalizationOptions()
+    .SetDefaultCulture(supportedCultures[0])
+    .AddSupportedCultures(supportedCultures)
+    .AddSupportedUICultures(supportedCultures);
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("en");
+    options.SupportedCultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
+    options.SupportedUICultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
+});
+builder.Services.AddSwaggerGen(c =>
+{
+    c.OperationFilter<AcceptLanguageHeaderFilter>();
+});
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -61,7 +76,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestTimingMiddleware>();
-
+app.UseRequestLocalization();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.MapControllers();
