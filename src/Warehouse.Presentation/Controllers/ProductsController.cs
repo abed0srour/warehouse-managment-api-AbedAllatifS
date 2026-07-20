@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Warehouse.Application.Common;
 using Warehouse.Application.Products;
+using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
+using Warehouse.Application.Resources;
 using Warehouse.Domain;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
@@ -16,13 +19,18 @@ namespace Warehouse.Presentation.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IStringLocalizer<SharedResources> _localizer;
+    private readonly ILogger<ProductsController> _logger;
+
 
     private const long MaxImageSizeBytes = 2 * 1024 * 1024;
     private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png" };
 
-    public ProductsController(IMediator mediator)
+    public ProductsController(IMediator mediator, IStringLocalizer<SharedResources> localizer, ILogger<ProductsController> logger)
     {
-        _mediator = mediator;
+      _mediator = mediator;
+      _localizer = localizer;
+      _logger = logger;
     }
 
     // 1. GET /api/products
@@ -40,7 +48,8 @@ public class ProductsController : ControllerBase
         var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            _logger.LogWarning("Product {ProductId} was not found", id);
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
 
         return Ok(product);
@@ -82,6 +91,8 @@ public class ProductsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
+        _logger.LogInformation("Product {ProductId} created with SKU {Sku}", product.Id, product.Sku);
+
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
     }
 
@@ -105,8 +116,10 @@ public class ProductsController : ControllerBase
 
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
+
+        _logger.LogInformation("Product {ProductId} quantity updated to {Quantity}", id, request.QuantityInStock);
 
         return Ok(product);
     }
@@ -131,8 +144,10 @@ public class ProductsController : ControllerBase
 
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
+
+        _logger.LogInformation("Product {ProductId} price updated to {Price}", id, request.Price);
 
         return Ok(product);
     }
@@ -145,7 +160,7 @@ public class ProductsController : ControllerBase
         var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return NotFound(new { message = _localizer["ProductNotFound"].Value });
         }
 
         if (file == null || file.Length == 0)
@@ -193,6 +208,8 @@ public class ProductsController : ControllerBase
             };
         }
 
+        _logger.LogInformation("Product {ProductId} archived", id);
+
         return NoContent();
     }
 
@@ -226,6 +243,8 @@ public class ProductsController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
+
+        _logger.LogInformation("Supplier {SupplierId} assigned to product {ProductId}", supplierId, id);
 
         return Ok(product);
     }
