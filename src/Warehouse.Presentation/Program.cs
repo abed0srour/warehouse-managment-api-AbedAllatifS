@@ -7,6 +7,8 @@ using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Repositories;
 using Serilog;
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 // Alias to the Db First DbContext (the one your repositories actually depend on)
 using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
@@ -56,6 +58,17 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "WarehouseApi_";
 });
 
+builder.Services.AddHealthChecks()
+    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "postgresql", tags: new[] { "db", "postgres" })
+    .AddRedis(builder.Configuration.GetConnectionString("Redis")!, name: "redis", tags: new[] { "cache", "redis" });
+
+builder.Services.AddHealthChecksUI(opts =>
+{
+    opts.SetEvaluationTimeInSeconds(15);
+    opts.MaximumHistoryEntriesPerEndpoint(50);
+    opts.AddHealthCheckEndpoint("Warehouse API Health", "/health");
+}).AddInMemoryStorage();
+
 // Single source of truth for the DbContext: factory + scoped wrapper
 builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -93,6 +106,19 @@ app.UseMiddleware<RequestTimingMiddleware>();
 app.UseRequestLocalization();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.MapHealthChecksUI(options =>
+{
+    options.UIPath = "/health-ui";
+    options.ApiPath = "/health-ui-api";
+});
+
 app.MapControllers();
 
 var urls = app.Urls.ToArray();
