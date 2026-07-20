@@ -4,11 +4,12 @@ using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common;
 using Warehouse.Domain;
 
-public record DeactivateSupplierCommand(Guid Id) : IRequest<bool>;
+public record DeactivateSupplierCommand(Guid Id) : IRequest<Result>;
 
-public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSupplierCommand, bool>
+public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSupplierCommand, Result>
 {
     private readonly ISupplierRepository _supplierRepository;
 
@@ -17,7 +18,7 @@ public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSuppli
         _supplierRepository = supplierRepository;
     }
 
-    public async Task<bool> Handle(DeactivateSupplierCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeactivateSupplierCommand request, CancellationToken cancellationToken)
     {
         var supplier = await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
         if (supplier == null) return false;

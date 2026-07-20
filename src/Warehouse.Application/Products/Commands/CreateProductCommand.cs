@@ -1,5 +1,6 @@
 namespace Warehouse.Application.Products.Commands;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Linq;
@@ -21,10 +22,12 @@ public record CreateProductCommand(
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Product>
 {
     private readonly IProductRepository _productRepository;
+    private readonly IMapper _mapper;
 
-    public CreateProductCommandHandler(IProductRepository productRepository)
+    public CreateProductCommandHandler(IProductRepository productRepository, IMapper mapper)
     {
         _productRepository = productRepository;
+        _mapper = mapper;
     }
 
     public async Task<Product> Handle(CreateProductCommand request, CancellationToken cancellationToken)

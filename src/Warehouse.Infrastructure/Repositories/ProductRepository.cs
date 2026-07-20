@@ -5,8 +5,10 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Data;
+using EfProduct = Warehouse.Infrastructure.Data.EfModels.Product;
+using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
 public class ProductRepository : IProductRepository
 {

@@ -1,5 +1,6 @@
 namespace Warehouse.Application.Products.Commands;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Threading;
@@ -13,11 +14,13 @@ public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierComman
 {
     private readonly IProductRepository _productRepository;
     private readonly ISupplierRepository _supplierRepository;
+    private readonly IMapper _mapper;
 
-    public AssignSupplierCommandHandler(IProductRepository productRepository, ISupplierRepository supplierRepository)
+    public AssignSupplierCommandHandler(IProductRepository productRepository, ISupplierRepository supplierRepository, IMapper mapper)
     {
         _productRepository = productRepository;
         _supplierRepository = supplierRepository;
+        _mapper = mapper;
     }
 
     public async Task<Product> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)

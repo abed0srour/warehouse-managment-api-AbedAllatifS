@@ -1,23 +1,26 @@
 namespace Warehouse.Application.Suppliers.Queries;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 
-public record GetSupplierByIdQuery(Guid Id) : IRequest<Supplier?>;
+public record GetSupplierByIdQuery(Guid Id) : IRequest<SupplierViewModel?>;
 
-public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery, Supplier?>
+public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery, SupplierViewModel?>
 {
     private readonly ISupplierRepository _supplierRepository;
+    private readonly IMapper _mapper;
 
-    public GetSupplierByIdQueryHandler(ISupplierRepository supplierRepository)
+    public GetSupplierByIdQueryHandler(ISupplierRepository supplierRepository, IMapper mapper)
     {
         _supplierRepository = supplierRepository;
+        _mapper = mapper;
     }
 
-    public async Task<Supplier?> Handle(GetSupplierByIdQuery request, CancellationToken cancellationToken)
+    public async Task<SupplierViewModel?> Handle(GetSupplierByIdQuery request, CancellationToken cancellationToken)
     {
         return await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
     }

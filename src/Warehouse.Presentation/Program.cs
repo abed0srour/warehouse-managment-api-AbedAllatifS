@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore; // Added for EF Core
 using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Warehouse.Infrastructure.Data;
@@ -19,7 +20,23 @@ builder.Services.AddControllers(options =>
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateProductCommand).Assembly));
+
+// 1. Register your Docker PostgreSQL Database Context
+builder.Services.AddDbContext<WarehouseDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 2. Updated MediatR to scan BOTH Application and Infrastructure assemblies
+builder.Services.AddMediatR(cfg => 
+{
+    cfg.RegisterServicesFromAssembly(typeof(CreateProductCommand).Assembly);
+    
+    cfg.RegisterServicesFromAssembly(typeof(WarehouseDbContext).Assembly);
+});
+builder.Services.AddAutoMapper(
+    cfg => { },
+    typeof(Warehouse.Application.MappingProfile).Assembly,
+    typeof(Warehouse.Infrastructure.Mapping.EfMappingProfile).Assembly);
+
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 

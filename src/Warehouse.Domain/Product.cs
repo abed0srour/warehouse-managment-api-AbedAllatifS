@@ -42,6 +42,38 @@ public class Product
         };
     }
 
+    // Rehydrates a Product from persisted state without re-running creation invariants.
+    public static Product Reconstruct(
+        Guid id,
+        string name,
+        string sku,
+        string description,
+        decimal price,
+        int quantityInStock,
+        string? supplierName,
+        Guid? supplierId,
+        DateTime? expiryDate,
+        bool isArchived,
+        DateTime createdAt,
+        DateTime? lastUpdatedAt)
+    {
+        return new Product
+        {
+            Id = id,
+            Name = name,
+            Sku = sku,
+            Description = description,
+            Price = price,
+            QuantityInStock = quantityInStock,
+            SupplierName = supplierName,
+            SupplierId = supplierId,
+            ExpiryDate = expiryDate,
+            IsArchived = isArchived,
+            CreatedAt = createdAt,
+            LastUpdatedAt = lastUpdatedAt
+        };
+    }
+
     public void UpdatePrice(decimal newPrice)
     {
         if (IsArchived)

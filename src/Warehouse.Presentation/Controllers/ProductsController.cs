@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
-using Warehouse.Domain;
 using WarehouseManagement.Api.Contracts;
 
 namespace Warehouse.Presentation.Controllers;

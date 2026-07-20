@@ -1,23 +1,27 @@
 namespace Warehouse.Application.Products.Commands;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common;
 using Warehouse.Domain;
 
-public record ArchiveProductCommand(Guid Id) : IRequest<bool>;
+public record ArchiveProductCommand(Guid Id) : IRequest<Result<ProductViewModel>>;
 
-public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductCommand, bool>
+public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductCommand, Result<ProductViewModel>>
 {
     private readonly IProductRepository _productRepository;
+    private readonly IMapper _mapper;
 
-    public ArchiveProductCommandHandler(IProductRepository productRepository)
+    public ArchiveProductCommandHandler(IProductRepository productRepository, IMapper mapper)
     {
         _productRepository = productRepository;
+        _mapper = mapper;
     }
 
-    public async Task<bool> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
+    public async Task<Result<ProductViewModel>> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
     {
         var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
         if (product == null) return false;

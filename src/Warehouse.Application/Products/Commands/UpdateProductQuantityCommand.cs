@@ -1,9 +1,11 @@
 namespace Warehouse.Application.Products.Commands;
 
+using AutoMapper;
 using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common;
 using Warehouse.Domain;
 
 public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<Product?>;
@@ -11,10 +13,12 @@ public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<
 public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProductQuantityCommand, Product?>
 {
     private readonly IProductRepository _productRepository;
+    private readonly IMapper _mapper;
 
-    public UpdateProductQuantityCommandHandler(IProductRepository productRepository)
+    public UpdateProductQuantityCommandHandler(IProductRepository productRepository, IMapper mapper)
     {
         _productRepository = productRepository;
+        _mapper = mapper;
     }
 
     public async Task<Product?> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)

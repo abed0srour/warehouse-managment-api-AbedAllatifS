@@ -5,8 +5,10 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Data;
+using EfSupplier = Warehouse.Infrastructure.Data.EfModels.Supplier;
+using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
 public class SupplierRepository : ISupplierRepository
 {

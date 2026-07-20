@@ -1,9 +1,10 @@
 namespace Warehouse.Application.Suppliers.Commands;
 
+using AutoMapper;
 using MediatR;
-using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Warehouse.Application.Common;
 using Warehouse.Domain;
 
 public record CreateSupplierCommand(string Name, string Country, string ContactEmail, string PhoneNumber) : IRequest<Supplier>;
@@ -11,17 +12,19 @@ public record CreateSupplierCommand(string Name, string Country, string ContactE
 public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Supplier>
 {
     private readonly ISupplierRepository _supplierRepository;
+    private readonly IMapper _mapper;
 
-    public CreateSupplierCommandHandler(ISupplierRepository supplierRepository)
+    public CreateSupplierCommandHandler(ISupplierRepository supplierRepository, IMapper mapper)
     {
         _supplierRepository = supplierRepository;
+        _mapper = mapper;
     }
 
     public async Task<Supplier> Handle(CreateSupplierCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            throw new ArgumentException("Supplier name is required.");
+            return Result.Failure<SupplierViewModel>(ErrorType.Validation, "Supplier name is required.");
         }
 
         var supplier = new Supplier
