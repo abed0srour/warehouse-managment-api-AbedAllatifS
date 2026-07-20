@@ -9,6 +9,8 @@ using Warehouse.Infrastructure.Repositories;
 using Serilog;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Hangfire;
+using Warehouse.Application.BackgroundJobs;
 
 // Alias to the Db First DbContext (the one your repositories actually depend on)
 using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
@@ -69,6 +71,11 @@ builder.Services.AddHealthChecksUI(opts =>
     opts.AddHealthCheckEndpoint("Warehouse API Health", "/health");
 }).AddInMemoryStorage();
 
+builder.Services.AddHangfire(config => config.UseInMemoryStorage());
+builder.Services.AddHangfireServer();
+
+builder.Services.AddScoped<ProductExpiryCheckJob>();
+
 // Single source of truth for the DbContext: factory + scoped wrapper
 builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -119,7 +126,14 @@ app.MapHealthChecksUI(options =>
     options.ApiPath = "/health-ui-api";
 });
 
+app.UseHangfireDashboard("/hangfire");
+
 app.MapControllers();
+
+RecurringJob.AddOrUpdate<ProductExpiryCheckJob>(
+    "product-expiry-check",
+    job => job.CheckExpiringProductsAsync(default),
+    Cron.Daily);
 
 var urls = app.Urls.ToArray();
 var urlsText = string.Join(", ", urls);
