@@ -74,6 +74,6 @@ public class ProductRepository : IProductRepository
         ExpiryDate = product.ExpiryDate,
         IsArchived = product.IsArchived,
         CreatedAt = product.CreatedAt,
-        LastUpdatedAt = product.LastUpdatedAt ?? product.CreatedAt
+        LastUpdatedAt = product.LastUpdatedAt
     };
 }

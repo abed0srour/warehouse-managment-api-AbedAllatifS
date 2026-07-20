@@ -27,7 +27,7 @@ public partial class Product
 
     public DateTime CreatedAt { get; set; }
 
-    public DateTime LastUpdatedAt { get; set; }
+    public DateTime? LastUpdatedAt { get; set; }
 
     public virtual ICollection<Productimage> Productimages { get; set; } = new List<Productimage>();
 

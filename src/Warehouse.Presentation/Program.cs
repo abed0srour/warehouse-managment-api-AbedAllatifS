@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore; 
-using Warehouse.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Warehouse.Application.Products.Commands;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
@@ -7,6 +6,9 @@ using Warehouse.Presentation.Filters;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Repositories;
+
+// Alias to the Db First DbContext (the one your repositories actually depend on)
+using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,17 +21,14 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.OperationFilter<AcceptLanguageHeaderFilter>();
 });
-// 1. Register your Docker PostgreSQL Database Context
-builder.Services.AddDbContext<WarehouseDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Updated MediatR to scan BOTH Application and Infrastructure assemblies
-builder.Services.AddMediatR(cfg => 
+// MediatR scans both Application and Infrastructure assemblies
+builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssembly(typeof(CreateProductCommand).Assembly);
-    
     cfg.RegisterServicesFromAssembly(typeof(WarehouseDbContext).Assembly);
 });
+
 builder.Services.AddAutoMapper(
     cfg => { },
     typeof(Warehouse.Application.MappingProfile).Assembly,
@@ -38,18 +37,17 @@ builder.Services.AddAutoMapper(
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
+// Single source of truth for the DbContext: factory + scoped wrapper
 builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<WarehouseDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<WarehouseDbContext>>().CreateDbContext());
-builder.Services.AddLocalization();
-var supportedCultures = new[] { "en", "fr" };
 
-var localizationOptions = new RequestLocalizationOptions()
-    .SetDefaultCulture(supportedCultures[0])
-    .AddSupportedCultures(supportedCultures)
-    .AddSupportedUICultures(supportedCultures);
+// Localization
+builder.Services.AddLocalization();
+
+var supportedCultures = new[] { "en", "fr" };
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
@@ -57,10 +55,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedCultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
     options.SupportedUICultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
 });
-builder.Services.AddSwaggerGen(c =>
-{
-    c.OperationFilter<AcceptLanguageHeaderFilter>();
-});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
