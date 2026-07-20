@@ -14,7 +14,7 @@ public class Product
     public Guid? SupplierId { get; private set; } 
     public DateTime? ExpiryDate { get; set; }
     public bool IsArchived { get; private set; } = false;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     public DateTime? LastUpdatedAt { get; set; }
 
     public virtual Supplier? Supplier { get; set; }
@@ -83,7 +83,7 @@ public class Product
             throw new ArgumentException("Price must be greater than zero.");
 
         Price = newPrice;
-        LastUpdatedAt = DateTime.UtcNow;
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 
     public void UpdateQuantity(int newQuantity)
@@ -95,13 +95,13 @@ public class Product
             throw new ArgumentException("Quantity cannot be negative.");
 
         QuantityInStock = newQuantity;
-        LastUpdatedAt = DateTime.UtcNow;
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 
     public void Archive()
     {
         IsArchived = true;
-        LastUpdatedAt = DateTime.UtcNow;
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 
     public void AssignSupplier(Supplier supplier)
@@ -115,6 +115,6 @@ public class Product
         SupplierId = supplier.Id;
         SupplierName = supplier.Name;
         Supplier = supplier; 
-        LastUpdatedAt = DateTime.UtcNow;
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 }

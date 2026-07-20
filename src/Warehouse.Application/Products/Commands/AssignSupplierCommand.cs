@@ -2,6 +2,7 @@ namespace Warehouse.Application.Products.Commands;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,12 +16,14 @@ public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierComman
     private readonly IProductRepository _productRepository;
     private readonly ISupplierRepository _supplierRepository;
     private readonly IMapper _mapper;
+    private readonly IDistributedCache _cache;
 
-    public AssignSupplierCommandHandler(IProductRepository productRepository, ISupplierRepository supplierRepository, IMapper mapper)
+    public AssignSupplierCommandHandler(IProductRepository productRepository, ISupplierRepository supplierRepository, IMapper mapper, IDistributedCache cache)
     {
         _productRepository = productRepository;
         _supplierRepository = supplierRepository;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<Product> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)
@@ -39,6 +42,10 @@ public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierComman
 
         product.AssignSupplier(supplier);
         await _productRepository.UpdateAsync(product, cancellationToken);
+
+        await _cache.RemoveAsync("products:all:True", cancellationToken);
+        await _cache.RemoveAsync("products:all:False", cancellationToken);
+        await _cache.RemoveAsync($"products:{request.ProductId}", cancellationToken);
 
         return product;
     }

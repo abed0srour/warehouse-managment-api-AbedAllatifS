@@ -42,13 +42,13 @@ public partial class WarehouseDbContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.ExpiryDate).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.IsArchived).HasDefaultValue(false);
+            entity.Property(e => e.IsArchived).ValueGeneratedNever();
             entity.Property(e => e.LastUpdatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.Name).HasMaxLength(255);
             entity.Property(e => e.Price).HasPrecision(18, 2);
-            entity.Property(e => e.QuantityInStock).HasDefaultValue(0);
+            entity.Property(e => e.QuantityInStock).ValueGeneratedNever();
             entity.Property(e => e.Sku)
                 .HasMaxLength(100);
             entity.Property(e => e.SupplierName).HasMaxLength(255);
@@ -81,7 +81,7 @@ public partial class WarehouseDbContext : DbContext
                 .ValueGeneratedNever();
             entity.Property(e => e.ContactEmail).HasMaxLength(255);
             entity.Property(e => e.Country).HasMaxLength(100);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.IsActive).ValueGeneratedNever();
             entity.Property(e => e.Name).HasMaxLength(255);
             entity.Property(e => e.PhoneNumber).HasMaxLength(50);
         });

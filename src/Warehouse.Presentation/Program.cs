@@ -50,6 +50,12 @@ builder.Services.AddAutoMapper(
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "WarehouseApi_";
+});
+
 // Single source of truth for the DbContext: factory + scoped wrapper
 builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
