@@ -5,12 +5,12 @@ using MediatR;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Warehouse.Application.Common;
+using Warehouse.Application.Common.Exceptions;
 using Warehouse.Domain;
 
-public record AssignSupplierCommand(Guid ProductId, Guid SupplierId) : IRequest<Result<ProductViewModel>>;
+public record AssignSupplierCommand(Guid ProductId, Guid SupplierId) : IRequest<Product>;
 
-public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierCommand, Result<ProductViewModel>>
+public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierCommand, Product>
 {
     private readonly IProductRepository _productRepository;
     private readonly ISupplierRepository _supplierRepository;
@@ -23,30 +23,23 @@ public class AssignSupplierCommandHandler : IRequestHandler<AssignSupplierComman
         _mapper = mapper;
     }
 
-    public async Task<Result<ProductViewModel>> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)
+    public async Task<Product> Handle(AssignSupplierCommand request, CancellationToken cancellationToken)
     {
         var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
         if (product == null)
         {
-            return Result.Failure<ProductViewModel>(ErrorType.NotFound, $"Product with ID {request.ProductId} was not found.");
+            throw new NotFoundException($"Product with ID {request.ProductId} was not found.");
         }
 
         var supplier = await _supplierRepository.GetByIdAsync(request.SupplierId, cancellationToken);
         if (supplier == null)
         {
-            return Result.Failure<ProductViewModel>(ErrorType.NotFound, $"Supplier with ID {request.SupplierId} was not found.");
+            throw new NotFoundException($"Supplier with ID {request.SupplierId} was not found.");
         }
 
-        try
-        {
-            product.AssignSupplier(supplier);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Failure<ProductViewModel>(ErrorType.Conflict, ex.Message);
-        }
-
+        product.AssignSupplier(supplier);
         await _productRepository.UpdateAsync(product, cancellationToken);
-        return Result.Success(_mapper.Map<ProductViewModel>(product));
+
+        return product;
     }
 }

@@ -16,46 +16,34 @@ public class ProductRepository : IProductRepository
 
     public ProductRepository(WarehouseDbContext context)
     {
-        _context = context;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        return entity is null ? null : ToDomain(entity);
+        var entity = await _context.Products
+            .AsNoTracking()
+            .Include(p => p.Supplier)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        return entity == null ? null : ToDomain(entity);
     }
 
-    public async Task<IEnumerable<Product>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<IEnumerable<Product>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var entities = await _context.Products.AsNoTracking().ToListAsync(cancellationToken);
         return entities.Select(ToDomain).ToList();
     }
 
-    public async Task AddAsync(Product product, CancellationToken cancellationToken)
+    public async Task AddAsync(Product product, CancellationToken cancellationToken = default)
     {
-        _context.Products.Add(ToEntity(product));
+        await _context.Products.AddAsync(ToEntity(product), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateAsync(Product product, CancellationToken cancellationToken)
+    public async Task UpdateAsync(Product product, CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken);
-        if (entity is null)
-        {
-            return;
-        }
-
-        entity.Name = product.Name;
-        entity.Sku = product.Sku;
-        entity.Description = product.Description;
-        entity.Price = product.Price;
-        entity.QuantityInStock = product.QuantityInStock;
-        entity.SupplierName = product.SupplierName;
-        entity.SupplierId = product.SupplierId;
-        entity.ExpiryDate = product.ExpiryDate;
-        entity.IsArchived = product.IsArchived;
-        entity.LastUpdatedAt = product.LastUpdatedAt ?? DateTime.UtcNow;
-
+        _context.Products.Update(ToEntity(product));
         await _context.SaveChangesAsync(cancellationToken);
     }
 

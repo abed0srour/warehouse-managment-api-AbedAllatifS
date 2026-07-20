@@ -31,6 +31,7 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
 
         product.Archive();
         await _productRepository.UpdateAsync(product, cancellationToken);
+
         return Result.Success(_mapper.Map<ProductViewModel>(product));
     }
 }

@@ -3,9 +3,10 @@ namespace Warehouse.Application.Products.Commands;
 using AutoMapper;
 using MediatR;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Warehouse.Application.Common;
+using Warehouse.Application.Common.Exceptions;
 using Warehouse.Domain;
 
 public record CreateProductCommand(
@@ -14,10 +15,11 @@ public record CreateProductCommand(
     string Description,
     decimal Price,
     int QuantityInStock,
+    string? SupplierName,
     DateTime? ExpiryDate
-) : IRequest<Result<ProductViewModel>>;
+) : IRequest<Product>;
 
-public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductViewModel>>
+public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Product>
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
@@ -28,23 +30,24 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         _mapper = mapper;
     }
 
-    public async Task<Result<ProductViewModel>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    public async Task<Product> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
-        Product product;
-        try
+        var existingProducts = await _productRepository.GetAllAsync(cancellationToken);
+        var duplicateSku = existingProducts.Any(p =>
+            string.Equals(p.Sku, request.Sku, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicateSku)
         {
-            // Enforce domain validation rules on creation
-            product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<ProductViewModel>(ErrorType.Validation, ex.Message);
+            throw new BusinessRuleException($"A product with SKU '{request.Sku}' already exists.");
         }
 
+        // Enforce domain validation rules on creation
+        var product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
         product.Description = request.Description;
+        product.SupplierName = request.SupplierName;
         product.ExpiryDate = request.ExpiryDate;
 
         await _productRepository.AddAsync(product, cancellationToken);
-        return Result.Success(_mapper.Map<ProductViewModel>(product));
+        return product;
     }
 }

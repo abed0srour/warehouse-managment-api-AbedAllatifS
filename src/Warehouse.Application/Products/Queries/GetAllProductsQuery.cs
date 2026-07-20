@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 
-public record GetAllProductsQuery() : IRequest<IEnumerable<ProductViewModel>>;
+public record GetAllProductsQuery(bool OnlyAvailable = false) : IRequest<IEnumerable<ProductViewModel>>;
 
 public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, IEnumerable<ProductViewModel>>
 {
@@ -24,6 +24,16 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
     public async Task<IEnumerable<ProductViewModel>> Handle(GetAllProductsQuery request, CancellationToken cancellationToken)
     {
         var products = await _productRepository.GetAllAsync(cancellationToken);
-        return products.Select(_mapper.Map<ProductViewModel>).ToList();
+
+        var query = products.AsEnumerable();
+
+        if (request.OnlyAvailable)
+        {
+            query = query.Where(p => !p.IsArchived && p.QuantityInStock > 0);
+        }
+
+        var ordered = query.OrderByDescending(p => p.CreatedAt).ToList();
+
+        return _mapper.Map<IEnumerable<ProductViewModel>>(ordered);
     }
 }

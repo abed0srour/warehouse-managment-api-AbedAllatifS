@@ -1,17 +1,23 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore; // Added for EF Core
 using Scalar.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+using Warehouse.Infrastructure.Data;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Application.Suppliers.Commands;
 using Warehouse.Application.Suppliers.Queries;
+using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
-using Warehouse.Infrastructure.Data.EfModels; // Added to access your scaffolded DbContext
+using Warehouse.Presentation.Filters;
 using Warehouse.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ActionLoggingFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -34,6 +40,12 @@ builder.Services.AddAutoMapper(
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
+builder.Services.AddDbContextFactory<WarehouseDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<WarehouseDbContext>(sp =>
+    sp.GetRequiredService<IDbContextFactory<WarehouseDbContext>>().CreateDbContext());
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -45,6 +57,10 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger";
     });
 }
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestTimingMiddleware>();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

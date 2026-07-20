@@ -23,6 +23,6 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, P
     public async Task<ProductViewModel?> Handle(GetProductByIdQuery request, CancellationToken cancellationToken)
     {
         var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
-        return product is null ? null : _mapper.Map<ProductViewModel>(product);
+        return product == null ? null : _mapper.Map<ProductViewModel>(product);
     }
 }

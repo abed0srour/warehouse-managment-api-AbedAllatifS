@@ -1,92 +1,78 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Warehouse.Application.Common;
+using Warehouse.Application.Suppliers;
 using Warehouse.Application.Suppliers.Commands;
 using Warehouse.Application.Suppliers.Queries;
 using WarehouseManagement.Api.Contracts;
 
-namespace WarehouseManagement.Api.Controllers
+namespace Warehouse.Presentation.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class SuppliersController : ControllerBase
 {
-    [ApiController]
-    [Route("api/suppliers")]
-    public class SuppliersController : ControllerBase
+    private readonly IMediator _mediator;
+
+    public SuppliersController(IMediator mediator)
     {
-        private readonly IMediator _mediator;
+        _mediator = mediator;
+    }
 
-        public SuppliersController(IMediator mediator)
+    // GET /api/suppliers
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<SupplierViewModel>>> GetAll(CancellationToken cancellationToken)
+    {
+        var suppliers = await _mediator.Send(new GetAllSuppliersQuery(), cancellationToken);
+        return Ok(suppliers);
+    }
+
+    // GET /api/suppliers/{id}
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<SupplierViewModel>> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var supplier = await _mediator.Send(new GetSupplierByIdQuery(id), cancellationToken);
+        if (supplier == null)
         {
-            _mediator = mediator;
+            return NotFound(new { message = $"Supplier with ID {id} was not found." });
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllSuppliers(CancellationToken cancellationToken)
+        return Ok(supplier);
+    }
+
+    // POST /api/suppliers
+    [HttpPost]
+    public async Task<ActionResult<SupplierViewModel>> Create([FromBody] CreateSupplierRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new CreateSupplierCommand(
+            request.Name,
+            request.Country,
+            request.ContactEmail,
+            request.PhoneNumber), cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            var suppliers = await _mediator.Send(new GetAllSuppliersQuery(), cancellationToken);
-            return Ok(suppliers);
+            return BadRequest(new { message = result.Error!.Message });
         }
 
-        [HttpGet("{id:guid}")]
-        public async Task<IActionResult> GetSupplierById([FromRoute] Guid id, CancellationToken cancellationToken)
+        return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+    }
+
+    // DELETE /api/suppliers/{id} - deactivate, not remove
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new DeactivateSupplierCommand(id), cancellationToken);
+        if (!result.IsSuccess)
         {
-            var supplier = await _mediator.Send(new GetSupplierByIdQuery(id), cancellationToken);
-            if (supplier == null)
+            return result.Error!.Type switch
             {
-                return NotFound(new ProblemDetails
-                {
-                    Title = "Supplier not found",
-                    Detail = $"Supplier with ID {id} was not found.",
-                    Status = StatusCodes.Status404NotFound
-                });
-            }
-            return Ok(supplier);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequest request, CancellationToken cancellationToken)
-        {
-            var result = await _mediator.Send(
-                new CreateSupplierCommand(request.Name, request.Country, request.ContactEmail, request.PhoneNumber),
-                cancellationToken);
-
-            if (!result.IsSuccess)
-            {
-                return MapError(result.Error!);
-            }
-
-            return CreatedAtAction(nameof(GetSupplierById), new { id = result.Value!.Id }, result.Value);
-        }
-
-        [HttpDelete("{id:guid}")]
-        public async Task<IActionResult> DeactivateSupplier([FromRoute] Guid id, CancellationToken cancellationToken)
-        {
-            var result = await _mediator.Send(new DeactivateSupplierCommand(id), cancellationToken);
-            if (!result.IsSuccess)
-            {
-                return MapError(result.Error!);
-            }
-
-            return NoContent();
-        }
-
-        private IActionResult MapError(Error error)
-        {
-            var status = error.Type switch
-            {
-                ErrorType.NotFound => StatusCodes.Status404NotFound,
-                ErrorType.Validation => StatusCodes.Status400BadRequest,
-                ErrorType.Conflict => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest
+                ErrorType.NotFound => NotFound(new { message = result.Error.Message }),
+                ErrorType.Conflict => Conflict(new { message = result.Error.Message }),
+                _ => BadRequest(new { message = result.Error.Message })
             };
-
-            return StatusCode(status, new ProblemDetails
-            {
-                Title = error.Type.ToString(),
-                Detail = error.Message,
-                Status = status
-            });
         }
+
+        return NoContent();
     }
 }

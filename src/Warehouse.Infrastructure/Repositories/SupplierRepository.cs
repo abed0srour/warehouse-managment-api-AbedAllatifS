@@ -16,41 +16,34 @@ public class SupplierRepository : ISupplierRepository
 
     public SupplierRepository(WarehouseDbContext context)
     {
-        _context = context;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Suppliers.AsNoTracking().FirstOrDefaultAsync(s => s.SupplierId == id, cancellationToken);
-        return entity is null ? null : ToDomain(entity);
+        var entity = await _context.Suppliers
+            .AsNoTracking()
+            .Include(s => s.Products)
+            .FirstOrDefaultAsync(s => s.SupplierId == id, cancellationToken);
+
+        return entity == null ? null : ToDomain(entity);
     }
 
-    public async Task<IEnumerable<Supplier>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<IEnumerable<Supplier>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var entities = await _context.Suppliers.AsNoTracking().ToListAsync(cancellationToken);
         return entities.Select(ToDomain).ToList();
     }
 
-    public async Task AddAsync(Supplier supplier, CancellationToken cancellationToken)
+    public async Task AddAsync(Supplier supplier, CancellationToken cancellationToken = default)
     {
-        _context.Suppliers.Add(ToEntity(supplier));
+        await _context.Suppliers.AddAsync(ToEntity(supplier), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateAsync(Supplier supplier, CancellationToken cancellationToken)
+    public async Task UpdateAsync(Supplier supplier, CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierId == supplier.Id, cancellationToken);
-        if (entity is null)
-        {
-            return;
-        }
-
-        entity.Name = supplier.Name;
-        entity.Country = supplier.Country;
-        entity.ContactEmail = supplier.ContactEmail;
-        entity.PhoneNumber = supplier.PhoneNumber;
-        entity.IsActive = supplier.IsActive;
-
+        _context.Suppliers.Update(ToEntity(supplier));
         await _context.SaveChangesAsync(cancellationToken);
     }
 

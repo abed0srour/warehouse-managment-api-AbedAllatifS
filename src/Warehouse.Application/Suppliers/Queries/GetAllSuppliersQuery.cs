@@ -24,6 +24,6 @@ public class GetAllSuppliersQueryHandler : IRequestHandler<GetAllSuppliersQuery,
     public async Task<IEnumerable<SupplierViewModel>> Handle(GetAllSuppliersQuery request, CancellationToken cancellationToken)
     {
         var suppliers = await _supplierRepository.GetAllAsync(cancellationToken);
-        return suppliers.Select(_mapper.Map<SupplierViewModel>).ToList();
+        return _mapper.Map<IEnumerable<SupplierViewModel>>(suppliers);
     }
 }

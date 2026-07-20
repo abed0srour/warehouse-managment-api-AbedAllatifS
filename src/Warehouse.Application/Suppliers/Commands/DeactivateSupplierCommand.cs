@@ -28,6 +28,7 @@ public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSuppli
 
         supplier.IsActive = false;
         await _supplierRepository.UpdateAsync(supplier, cancellationToken);
+
         return Result.Success();
     }
 }

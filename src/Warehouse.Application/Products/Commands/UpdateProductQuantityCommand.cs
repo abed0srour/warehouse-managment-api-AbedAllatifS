@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using Warehouse.Application.Common;
 using Warehouse.Domain;
 
-public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<Result<ProductViewModel>>;
+public record UpdateProductQuantityCommand(Guid Id, int NewQuantity) : IRequest<Product?>;
 
-public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProductQuantityCommand, Result<ProductViewModel>>
+public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProductQuantityCommand, Product?>
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
@@ -21,28 +21,13 @@ public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProduct
         _mapper = mapper;
     }
 
-    public async Task<Result<ProductViewModel>> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)
+    public async Task<Product?> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)
     {
         var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
-        if (product == null)
-        {
-            return Result.Failure<ProductViewModel>(ErrorType.NotFound, $"Product with ID {request.Id} was not found.");
-        }
+        if (product == null) return null;
 
-        try
-        {
-            product.UpdateQuantity(request.NewQuantity);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Failure<ProductViewModel>(ErrorType.Conflict, ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<ProductViewModel>(ErrorType.Validation, ex.Message);
-        }
-
+        product.UpdateQuantity(request.NewQuantity);
         await _productRepository.UpdateAsync(product, cancellationToken);
-        return Result.Success(_mapper.Map<ProductViewModel>(product));
+        return product;
     }
 }
