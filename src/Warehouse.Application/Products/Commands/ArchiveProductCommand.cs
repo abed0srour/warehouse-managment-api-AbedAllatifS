@@ -24,10 +24,14 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
     public async Task<Result<ProductViewModel>> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
     {
         var product = await _productRepository.GetByIdAsync(request.Id, cancellationToken);
-        if (product == null) return false;
+        if (product == null)
+        {
+            return Result.Failure<ProductViewModel>(ErrorType.NotFound, $"Product with ID {request.Id} was not found.");
+        }
 
         product.Archive();
         await _productRepository.UpdateAsync(product, cancellationToken);
-        return true;
+
+        return Result.Success(_mapper.Map<ProductViewModel>(product));
     }
 }

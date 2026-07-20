@@ -2,6 +2,9 @@ using System.Globalization;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Warehouse.Application.Common;
+using Warehouse.Application.Products;
+using Warehouse.Domain;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using WarehouseManagement.Api.Contracts;
@@ -24,7 +27,7 @@ public class ProductsController : ControllerBase
 
     // 1. GET /api/products
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetAll([FromQuery] bool onlyAvailable = false, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IEnumerable<ProductViewModel>>> GetAll([FromQuery] bool onlyAvailable = false, CancellationToken cancellationToken = default)
     {
         var products = await _mediator.Send(new GetAllProductsQuery(onlyAvailable), cancellationToken);
         return Ok(products);
@@ -32,7 +35,7 @@ public class ProductsController : ControllerBase
 
     // 2. GET /api/products/{id}
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<Product>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ProductViewModel>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var product = await _mediator.Send(new GetProductByIdQuery(id), cancellationToken);
         if (product == null)
@@ -45,7 +48,7 @@ public class ProductsController : ControllerBase
 
     // 3. GET /api/products/search?name=...&supplier=...
     [HttpGet("search")]
-    public async Task<ActionResult<IEnumerable<Product>>> Search(
+    public async Task<ActionResult<IEnumerable<ProductViewModel>>> Search(
         [FromQuery] string? name,
         [FromQuery] string? supplier, CancellationToken cancellationToken)
     {
@@ -179,10 +182,15 @@ public class ProductsController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var archived = await _mediator.Send(new ArchiveProductCommand(id), cancellationToken);
-        if (!archived)
+        var result = await _mediator.Send(new ArchiveProductCommand(id), cancellationToken);
+        if (!result.IsSuccess)
         {
-            return NotFound(new { message = $"Product with ID {id} was not found." });
+            return result.Error!.Type switch
+            {
+                ErrorType.NotFound => NotFound(new { message = result.Error.Message }),
+                ErrorType.Conflict => Conflict(new { message = result.Error.Message }),
+                _ => BadRequest(new { message = result.Error.Message })
+            };
         }
 
         return NoContent();

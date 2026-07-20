@@ -21,10 +21,14 @@ public class DeactivateSupplierCommandHandler : IRequestHandler<DeactivateSuppli
     public async Task<Result> Handle(DeactivateSupplierCommand request, CancellationToken cancellationToken)
     {
         var supplier = await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
-        if (supplier == null) return false;
+        if (supplier == null)
+        {
+            return Result.Failure(ErrorType.NotFound, $"Supplier with ID {request.Id} was not found.");
+        }
 
         supplier.IsActive = false;
         await _supplierRepository.UpdateAsync(supplier, cancellationToken);
-        return true;
+
+        return Result.Success();
     }
 }

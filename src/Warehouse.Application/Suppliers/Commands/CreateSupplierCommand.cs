@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Warehouse.Application.Common;
 using Warehouse.Domain;
 
-public record CreateSupplierCommand(string Name, string Country, string ContactEmail, string PhoneNumber) : IRequest<Supplier>;
+public record CreateSupplierCommand(string Name, string Country, string ContactEmail, string PhoneNumber) : IRequest<Result<SupplierViewModel>>;
 
-public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Supplier>
+public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Result<SupplierViewModel>>
 {
     private readonly ISupplierRepository _supplierRepository;
     private readonly IMapper _mapper;
@@ -20,7 +20,7 @@ public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierComman
         _mapper = mapper;
     }
 
-    public async Task<Supplier> Handle(CreateSupplierCommand request, CancellationToken cancellationToken)
+    public async Task<Result<SupplierViewModel>> Handle(CreateSupplierCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
@@ -37,6 +37,6 @@ public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierComman
         };
 
         await _supplierRepository.AddAsync(supplier, cancellationToken);
-        return supplier;
+        return Result.Success(_mapper.Map<SupplierViewModel>(supplier));
     }
 }

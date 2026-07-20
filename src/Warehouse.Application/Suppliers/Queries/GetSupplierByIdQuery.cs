@@ -22,6 +22,7 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
 
     public async Task<SupplierViewModel?> Handle(GetSupplierByIdQuery request, CancellationToken cancellationToken)
     {
-        return await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
+        var supplier = await _supplierRepository.GetByIdAsync(request.Id, cancellationToken);
+        return supplier == null ? null : _mapper.Map<SupplierViewModel>(supplier);
     }
 }

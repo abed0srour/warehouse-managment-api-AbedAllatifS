@@ -2,7 +2,7 @@ namespace Warehouse.Infrastructure.Repositories;
 
 using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -21,25 +21,59 @@ public class ProductRepository : IProductRepository
 
     public async Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Products
+        var entity = await _context.Products
+            .AsNoTracking()
             .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        return entity == null ? null : ToDomain(entity);
     }
 
     public async Task<IEnumerable<Product>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Products.ToListAsync(cancellationToken);
+        var entities = await _context.Products.AsNoTracking().ToListAsync(cancellationToken);
+        return entities.Select(ToDomain).ToList();
     }
 
     public async Task AddAsync(Product product, CancellationToken cancellationToken = default)
     {
-        await _context.Products.AddAsync(product, cancellationToken);
+        await _context.Products.AddAsync(ToEntity(product), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateAsync(Product product, CancellationToken cancellationToken = default)
     {
-        _context.Products.Update(product);
+        _context.Products.Update(ToEntity(product));
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private static Product ToDomain(EfProduct entity) => Product.Reconstruct(
+        entity.Id,
+        entity.Name,
+        entity.Sku,
+        entity.Description ?? string.Empty,
+        entity.Price,
+        entity.QuantityInStock,
+        entity.SupplierName,
+        entity.SupplierId,
+        entity.ExpiryDate,
+        entity.IsArchived,
+        entity.CreatedAt,
+        entity.LastUpdatedAt);
+
+    private static EfProduct ToEntity(Product product) => new()
+    {
+        Id = product.Id,
+        Name = product.Name,
+        Sku = product.Sku,
+        Description = product.Description,
+        Price = product.Price,
+        QuantityInStock = product.QuantityInStock,
+        SupplierName = product.SupplierName,
+        SupplierId = product.SupplierId,
+        ExpiryDate = product.ExpiryDate,
+        IsArchived = product.IsArchived,
+        CreatedAt = product.CreatedAt,
+        LastUpdatedAt = product.LastUpdatedAt ?? product.CreatedAt
+    };
 }

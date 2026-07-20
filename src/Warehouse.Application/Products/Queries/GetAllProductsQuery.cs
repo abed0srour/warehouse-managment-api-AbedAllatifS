@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
 
-public record GetAllProductsQuery(bool OnlyAvailable = false) : IRequest<IEnumerable<Product>>;
+public record GetAllProductsQuery(bool OnlyAvailable = false) : IRequest<IEnumerable<ProductViewModel>>;
 
 public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, IEnumerable<ProductViewModel>>
 {
@@ -32,6 +32,8 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
             query = query.Where(p => !p.IsArchived && p.QuantityInStock > 0);
         }
 
-        return query.OrderByDescending(p => p.CreatedAt).ToList();
+        var ordered = query.OrderByDescending(p => p.CreatedAt).ToList();
+
+        return _mapper.Map<IEnumerable<ProductViewModel>>(ordered);
     }
 }
