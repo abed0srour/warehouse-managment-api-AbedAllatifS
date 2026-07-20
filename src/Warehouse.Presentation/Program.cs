@@ -6,11 +6,24 @@ using Warehouse.Presentation.Filters;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Repositories;
+using Serilog;
 
 // Alias to the Db First DbContext (the one your repositories actually depend on)
 using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File(
+        "Logs/log-.txt",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .Enrich.FromLogContext()
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers(options =>
 {
@@ -85,4 +98,15 @@ var swaggerUrl = urls.Length > 0
 app.Logger.LogInformation("Swagger available at: {SwaggerUrl}", swaggerUrl);
 app.Logger.LogInformation("Application running on: {Urls}", urlsText);
 
-app.Run();
+try
+{
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
