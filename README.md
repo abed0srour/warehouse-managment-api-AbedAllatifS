@@ -36,4 +36,11 @@ Implemented features:
 - `POST /api/suppliers`
 - `DELETE /api/suppliers/{id}`
 
-
+## Session 07 — Firebase Auth & MinIO Storage
+- MinIO object storage for warehouse file attachments (`docker-compose.yml` runs a local MinIO
+  instance on ports 9000/9001).
+- `POST /api/files/upload`, `GET /api/files/{id}/download`, `DELETE /api/files/{id}`.
+- **TODO before any non-local deployment**: `MinIO:AccessKey` and `MinIO:SecretKey` in
+  `appsettings.json` are placeholder local-dev credentials. Move them to user-secrets
+  (`dotnet user-secrets set "MinIO:AccessKey" "..."`) or environment variables before this goes
+  anywhere near a shared or production environment — do not commit real credentials.
