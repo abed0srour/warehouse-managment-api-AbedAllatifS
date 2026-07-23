@@ -21,6 +21,8 @@ public partial class WarehouseDbContext : DbContext
 
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
+    public virtual DbSet<WarehouseFile> WarehouseFiles { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         if (!optionsBuilder.IsConfigured)
@@ -84,6 +86,18 @@ public partial class WarehouseDbContext : DbContext
             entity.Property(e => e.IsActive).ValueGeneratedNever();
             entity.Property(e => e.Name).HasMaxLength(255);
             entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<WarehouseFile>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.ObjectKey).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.ContentType).IsRequired().HasMaxLength(150);
+            entity.Property(e => e.UploadedByUid).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.RelatedEntityType).IsRequired().HasMaxLength(100);
         });
 
         OnModelCreatingPartial(modelBuilder);
