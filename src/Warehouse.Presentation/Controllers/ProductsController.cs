@@ -11,6 +11,7 @@ using Warehouse.Domain;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using WarehouseManagement.Api.Contracts;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Warehouse.Presentation.Controllers;
 
@@ -34,6 +35,7 @@ public class ProductsController : ControllerBase
     }
 
     // 1. GET /api/products
+    [Authorize(Policy = "AuthenticatedUser")] 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ProductViewModel>>> GetAll([FromQuery] bool onlyAvailable = false, CancellationToken cancellationToken = default)
     {
@@ -42,6 +44,7 @@ public class ProductsController : ControllerBase
     }
 
     // 2. GET /api/products/{id}
+    [Authorize(Policy = "AuthenticatedUser")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductViewModel>> GetById(Guid id, CancellationToken cancellationToken)
     {
@@ -56,6 +59,7 @@ public class ProductsController : ControllerBase
     }
 
     // 3. GET /api/products/search?name=...&supplier=...
+    [Authorize(Policy = "AuthenticatedUser")]
     [HttpGet("search")]
     public async Task<ActionResult<IEnumerable<ProductViewModel>>> Search(
         [FromQuery] string? name,
@@ -71,6 +75,7 @@ public class ProductsController : ControllerBase
     }
 
     // 4. POST /api/products
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost]
     public async Task<ActionResult<Product>> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
@@ -97,6 +102,7 @@ public class ProductsController : ControllerBase
     }
 
     // 5. POST /api/products/{id}/quantity
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost("{id:guid}/quantity")]
     public async Task<IActionResult> UpdateQuantity(Guid id, [FromBody] UpdateProductQuantityRequest request, CancellationToken cancellationToken)
     {
@@ -125,6 +131,7 @@ public class ProductsController : ControllerBase
     }
 
     // 6. POST /api/products/{id}/price
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost("{id:guid}/price")]
     public async Task<IActionResult> UpdatePrice(Guid id, [FromBody] UpdateProductPriceRequest request, CancellationToken cancellationToken)
     {
@@ -153,6 +160,7 @@ public class ProductsController : ControllerBase
     }
 
     // 7. POST /api/products/{id}/image
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost("{id:guid}/image")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadImage(Guid id, IFormFile file, CancellationToken cancellationToken)
@@ -194,6 +202,7 @@ public class ProductsController : ControllerBase
     }
 
     // 8. DELETE /api/products/{id} - soft delete
+    [Authorize(Policy = "AdminOnly")] 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
@@ -214,6 +223,7 @@ public class ProductsController : ControllerBase
     }
 
     // 9. GET /api/products/server-time
+    [Authorize(Policy = "AuthenticatedUser")]
     [HttpGet("server-time")]
     public IActionResult GetServerTime([FromHeader(Name = "Accept-Language")] string? acceptLanguage)
     {
@@ -231,6 +241,7 @@ public class ProductsController : ControllerBase
     }
 
     // Task 2 — POST /api/products/{id}/assign-supplier/{supplierId}
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost("{id:guid}/assign-supplier/{supplierId:guid}")]
     public async Task<IActionResult> AssignSupplier(Guid id, Guid supplierId, CancellationToken cancellationToken)
     {
