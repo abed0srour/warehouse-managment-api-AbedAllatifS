@@ -6,14 +6,20 @@ using Warehouse.Presentation.Filters;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
 using Warehouse.Infrastructure.Repositories;
+using Warehouse.Infrastructure.Storage;
 using Serilog;
+using Minio;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Hangfire;
 using Warehouse.Application.BackgroundJobs;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
-// Alias to the Db First DbContext (the one your repositories actually depend on)
 using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -34,10 +40,24 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<ActionLoggingFilter>();
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
 {
-    c.OperationFilter<AcceptLanguageHeaderFilter>();
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
+    });
 });
+
 
 // MediatR scans both Application and Infrastructure assemblies
 builder.Services.AddMediatR(cfg =>
@@ -53,6 +73,15 @@ builder.Services.AddAutoMapper(
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+
+builder.Services.AddMinio(configureClient => configureClient
+    .WithEndpoint(builder.Configuration["MinIO:Endpoint"])
+    .WithCredentials(builder.Configuration["MinIO:AccessKey"], builder.Configuration["MinIO:SecretKey"])
+    .WithSSL(builder.Configuration.GetValue<bool>("MinIO:UseSSL"))
+    .Build());
+
+builder.Services.AddScoped<IFileStorageService, MinioStorageService>();
+builder.Services.AddScoped<IWarehouseFileRepository, WarehouseFileRepository>();
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -95,6 +124,62 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedUICultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
 });
 
+var firebaseProjectId = builder.Configuration["Firebase:ProjectId"];
+
+using var firebaseJwksHttpClient = new HttpClient();
+var firebaseJwksJson = firebaseJwksHttpClient.GetStringAsync(
+    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com").GetAwaiter().GetResult();
+var firebaseSigningKeys = new JsonWebKeySet(firebaseJwksJson).GetSigningKeys();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
+            ValidAudience = firebaseProjectId,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            RoleClaimType = "role",
+            IssuerSigningKeys = firebaseSigningKeys
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"JWT AUTH FAILED: {context.Exception.GetType().Name} - {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("JWT AUTH SUCCESS");
+                foreach (var claim in context.Principal!.Claims)
+                {
+                    Console.WriteLine($"  CLAIM: {claim.Type} = {claim.Value}");
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+// Authorization policies (Step 4)
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
+    options.AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
+});
+var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountPath"]
+    ?? throw new InvalidOperationException("Firebase:ServiceAccountPath is not configured.");
+
+FirebaseApp.Create(new AppOptions
+{
+    Credential = CredentialFactory.FromFile<ServiceAccountCredential>(firebaseServiceAccountPath).ToGoogleCredential()
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -113,6 +198,8 @@ app.UseMiddleware<RequestTimingMiddleware>();
 app.UseRequestLocalization();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
