@@ -16,3 +16,6 @@
 *.sln.docstates
 Thumbs.db
 Desktop.ini
+*firebase-adminsdk*.json
+serviceAccountKey.json
+**/firebase-service-account*.json

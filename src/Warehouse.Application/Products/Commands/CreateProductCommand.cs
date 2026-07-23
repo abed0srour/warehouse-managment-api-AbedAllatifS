@@ -2,6 +2,7 @@ namespace Warehouse.Application.Products.Commands;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Linq;
 using System.Threading;
@@ -23,11 +24,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
+    private readonly IDistributedCache _cache;
 
-    public CreateProductCommandHandler(IProductRepository productRepository, IMapper mapper)
+    public CreateProductCommandHandler(IProductRepository productRepository, IMapper mapper, IDistributedCache cache)
     {
         _productRepository = productRepository;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<Product> Handle(CreateProductCommand request, CancellationToken cancellationToken)
@@ -45,9 +48,15 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         var product = Product.Create(request.Name, request.Sku, request.Price, request.QuantityInStock);
         product.Description = request.Description;
         product.SupplierName = request.SupplierName;
-        product.ExpiryDate = request.ExpiryDate;
+        product.ExpiryDate = request.ExpiryDate.HasValue
+            ? DateTime.SpecifyKind(request.ExpiryDate.Value, DateTimeKind.Unspecified)
+            : null;
 
         await _productRepository.AddAsync(product, cancellationToken);
+
+        await _cache.RemoveAsync("products:all:True", cancellationToken);
+        await _cache.RemoveAsync("products:all:False", cancellationToken);
+
         return product;
     }
 }
