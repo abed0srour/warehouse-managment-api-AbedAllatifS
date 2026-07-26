@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -27,9 +28,16 @@ namespace Warehouse.Notifications.Api.Controllers
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<NotificationViewModel>>> GetNotifications(
+            [FromQuery] NotificationStatus? status,
             CancellationToken cancellationToken)
         {
             var notifications = await _notificationRepository.GetAllAsync(cancellationToken);
+
+            if (status is not null)
+            {
+                notifications = notifications.Where(n => n.Status == status);
+            }
+
             return Ok(_mapper.Map<IEnumerable<NotificationViewModel>>(notifications));
         }
 
