@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
+using Warehouse.Domain.Constants;
 
 public record LowStockProductDto(Guid Id, string Name, int QuantityInStock);
 
@@ -15,7 +16,7 @@ public record InventoryDashboardDto(
     IReadOnlyList<LowStockProductDto> LowStockProducts,
     int TotalSuppliers);
 
-public record GetInventoryDashboardQuery(int LowStockThreshold = 10) : IRequest<InventoryDashboardDto>;
+public record GetInventoryDashboardQuery(int LowStockThreshold = StockThresholds.LowStock) : IRequest<InventoryDashboardDto>;
 
 public class GetInventoryDashboardQueryHandler : IRequestHandler<GetInventoryDashboardQuery, InventoryDashboardDto>
 {
