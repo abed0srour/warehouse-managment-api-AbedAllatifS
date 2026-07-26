@@ -10,6 +10,7 @@ using Warehouse.Infrastructure.Storage;
 using Serilog;
 using Minio;
 using Warehouse.Infrastructure.Messaging;
+using Warehouse.Infrastructure.Notifications;
 using Warehouse.Domain.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using HealthChecks.UI.Client;
@@ -83,6 +84,16 @@ builder.Services.AddMinio(configureClient => configureClient
 
 builder.Services.AddScoped<IFileStorageService, MinioStorageService>();
 builder.Services.AddScoped<IWarehouseFileRepository, WarehouseFileRepository>();
+
+builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>(client =>
+{
+    var baseUrl = builder.Configuration["NotificationService:BaseUrl"]
+        ?? throw new InvalidOperationException("NotificationService:BaseUrl is not configured.");
+    var timeoutSeconds = builder.Configuration.GetValue<int?>("NotificationService:TimeoutSeconds") ?? 3;
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+});
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
