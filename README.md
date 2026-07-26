@@ -48,4 +48,9 @@ Add RabbitMQ with Docker Compose:
     Console: http://localhost:15672
     Username: warehouse
     Password: warehouse
+created Events:
+    IntegrationEvent: abstract base class with fields common to every event
+    StockLowDetected 
+    WarehouseFileUploaded 
+both main warehouse project and Warehouse.Notifications.Api reference the same physical Warehouse.Domain.csproj project to access these exact classes. deserialize messages into these exact shapes
 
