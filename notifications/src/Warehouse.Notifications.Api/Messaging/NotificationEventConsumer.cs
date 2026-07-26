@@ -6,6 +6,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Warehouse.Domain.Events;
 using Warehouse.Notifications.Api.Entities;
+using Warehouse.Notifications.Api.Preferences;
 using Warehouse.Notifications.Api.Repositories;
 
 namespace Warehouse.Notifications.Api.Messaging
@@ -16,19 +17,32 @@ namespace Warehouse.Notifications.Api.Messaging
         private const string FileUploadedRoutingKey = "file.uploaded";
         private const string DeadLetterExchangeSuffix = ".dlx";
         private const string DeadLetterQueueSuffix = ".dlq";
+        private const string RetryCountHeader = "x-retry-count";
+        private const int MaxRetries = 3;
+
+        // Backoff applied before each retry attempt: 1st retry waits 1s, 2nd waits 2s, 3rd waits 4s.
+        private static readonly TimeSpan[] RetryBackoff =
+        {
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(4)
+        };
 
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
         private readonly RabbitMqOptions _options;
+        private readonly NotificationPreferencesOptions _preferences;
         private readonly ILogger<NotificationEventConsumer> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
 
         public NotificationEventConsumer(
             IOptions<RabbitMqOptions> options,
+            IOptions<NotificationPreferencesOptions> preferences,
             ILogger<NotificationEventConsumer> logger,
             IServiceScopeFactory scopeFactory)
         {
             _options = options.Value;
+            _preferences = preferences.Value;
             _logger = logger;
             _scopeFactory = scopeFactory;
         }
@@ -147,13 +161,25 @@ namespace Warehouse.Notifications.Api.Messaging
                     return;
                 }
 
+                var notificationType = EventTypeMapper.ToNotificationType(routingKey);
+                _preferences.TryGetValue(notificationType, out var preference);
+
+                if (preference is not null && !preference.Enabled)
+                {
+                    _logger.LogInformation(
+                        "Notification type '{NotificationType}' is disabled by preference; skipping notification for event {EventId}.",
+                        notificationType, eventId);
+                    channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                    return;
+                }
+
                 var notification = new Notification
                 {
                     Id = Guid.NewGuid(),
-                    Type = EventTypeMapper.ToNotificationType(routingKey),
+                    Type = notificationType,
                     Title = EventTypeMapper.ToTitle(routingKey),
                     Message = EventTypeMapper.ToMessage(routingKey, @event),
-                    Severity = @event.Severity,
+                    Severity = preference?.Severity ?? @event.Severity,
                     Status = NotificationStatus.Unread,
                     CreatedAt = DateTime.UtcNow,
                     RelatedEntityId = @event.RelatedEntityId,
@@ -183,11 +209,67 @@ namespace Warehouse.Notifications.Api.Messaging
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex, "Failed to process message on routing key '{RoutingKey}' (delivery tag {DeliveryTag}). Requeueing for retry.",
-                    routingKey, eventArgs.DeliveryTag);
-                channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: true);
+                await HandleTransientFailureAsync(channel, eventArgs, ex);
             }
+        }
+
+        private async Task HandleTransientFailureAsync(IModel channel, BasicDeliverEventArgs eventArgs, Exception ex)
+        {
+            var routingKey = eventArgs.RoutingKey;
+            var retryCount = GetRetryCount(eventArgs.BasicProperties);
+
+            if (retryCount >= MaxRetries)
+            {
+                _logger.LogError(
+                    ex, "Failed to process message on routing key '{RoutingKey}' (delivery tag {DeliveryTag}) after {RetryCount} retries. Sending to dead-letter queue.",
+                    routingKey, eventArgs.DeliveryTag, retryCount);
+                channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: false);
+                return;
+            }
+
+            var delay = RetryBackoff[retryCount];
+            var nextRetryCount = retryCount + 1;
+
+            _logger.LogWarning(
+                ex, "Failed to process message on routing key '{RoutingKey}' (delivery tag {DeliveryTag}). Retry {NextRetryCount}/{MaxRetries} in {DelaySeconds}s.",
+                routingKey, eventArgs.DeliveryTag, nextRetryCount, MaxRetries, delay.TotalSeconds);
+
+            await Task.Delay(delay);
+
+            var headers = eventArgs.BasicProperties.Headers is not null
+                ? new Dictionary<string, object>(eventArgs.BasicProperties.Headers)
+                : new Dictionary<string, object>();
+            headers[RetryCountHeader] = nextRetryCount;
+
+            var retryProperties = channel.CreateBasicProperties();
+            retryProperties.Persistent = true;
+            retryProperties.ContentType = eventArgs.BasicProperties.ContentType;
+            retryProperties.Headers = headers;
+
+            channel.BasicPublish(
+                exchange: eventArgs.Exchange,
+                routingKey: routingKey,
+                mandatory: false,
+                basicProperties: retryProperties,
+                body: eventArgs.Body);
+
+            // The retry above is a new message on the queue; ack the original so it isn't
+            // redelivered as a duplicate on top of the retry we just published.
+            channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+        }
+
+        private static int GetRetryCount(IBasicProperties properties)
+        {
+            if (properties.Headers is null || !properties.Headers.TryGetValue(RetryCountHeader, out var value) || value is null)
+                return 0;
+
+            return value switch
+            {
+                int i => i,
+                long l => (int)l,
+                byte[] bytes => int.Parse(System.Text.Encoding.UTF8.GetString(bytes)),
+                _ => 0
+            };
         }
 
         private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
