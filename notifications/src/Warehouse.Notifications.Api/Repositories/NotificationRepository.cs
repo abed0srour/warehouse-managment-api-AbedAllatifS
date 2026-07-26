@@ -37,5 +37,18 @@ namespace Warehouse.Notifications.Api.Repositories
             _dbContext.Notifications.Update(notification);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task<bool> ExistsByEventIdAsync(string eventId, CancellationToken cancellationToken)
+        {
+            return await _dbContext.Notifications
+                .AsNoTracking()
+                .AnyAsync(n => n.EventId == eventId, cancellationToken);
+        }
+
+        public async Task AddAsync(Notification notification, CancellationToken cancellationToken)
+        {
+            _dbContext.Notifications.Add(notification);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

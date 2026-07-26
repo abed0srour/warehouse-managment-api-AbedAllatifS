@@ -11,5 +11,6 @@ namespace Warehouse.Notifications.Api.Entities
         public DateTime CreatedAt { get; set; }
         public required string RelatedEntityId { get; set; }
         public required string RelatedEntityType { get; set; }
+        public string? EventId { get; set; }
     }
 }

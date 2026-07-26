@@ -24,6 +24,8 @@ namespace Warehouse.Notifications.Api.Data
                 entity.Property(n => n.RelatedEntityId).IsRequired().HasMaxLength(100);
                 entity.Property(n => n.RelatedEntityType).IsRequired().HasMaxLength(100);
                 entity.Property(n => n.Status).IsRequired().HasConversion<string>().HasMaxLength(20);
+                entity.Property(n => n.EventId).HasMaxLength(100);
+                entity.HasIndex(n => n.EventId).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);

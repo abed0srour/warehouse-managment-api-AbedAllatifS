@@ -4,10 +4,11 @@ namespace Warehouse.Notifications.Api.Messaging
     {
         public const string SectionName = "RabbitMq";
 
-        public string HostName { get; set; } = "localhost";
-        public int Port { get; set; } = 5672;
-        public string UserName { get; set; } = "guest";
-        public string Password { get; set; } = "guest";
-        public string QueueName { get; set; } = "warehouse.notifications";
+        public string Host { get; set; } = string.Empty;
+        public int Port { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Exchange { get; set; } = string.Empty;
+        public string Queue { get; set; } = string.Empty;
     }
 }
