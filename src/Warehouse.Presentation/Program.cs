@@ -9,6 +9,8 @@ using Warehouse.Infrastructure.Repositories;
 using Warehouse.Infrastructure.Storage;
 using Serilog;
 using Minio;
+using Warehouse.Infrastructure.Messaging;
+using Warehouse.Domain.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -73,6 +75,8 @@ builder.Services.AddAutoMapper(
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 
 builder.Services.AddMinio(configureClient => configureClient
     .WithEndpoint(builder.Configuration["MinIO:Endpoint"])
