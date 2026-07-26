@@ -61,7 +61,7 @@ public class GetProductsGroupedByExpiryYearQueryHandler : IRequestHandler<GetPro
                     ExpiryDate = p.ExpiryDate,
                     IsArchived = p.IsArchived,
                     CreatedAt = p.CreatedAt,
-                    LastUpdatedAt = p.LastUpdatedAt
+                    LastUpdatedAt = p.LastUpdatedAt ?? p.CreatedAt
                 }).ToList()
             ))
             .ToListAsync(cancellationToken);
@@ -96,7 +96,7 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandler : IRequestHandler<
                     ExpiryDate = p.ExpiryDate,
                     IsArchived = p.IsArchived,
                     CreatedAt = p.CreatedAt,
-                    LastUpdatedAt = p.LastUpdatedAt
+                    LastUpdatedAt = p.LastUpdatedAt ?? p.CreatedAt
                 }).ToList()
             ))
             .ToListAsync(cancellationToken);

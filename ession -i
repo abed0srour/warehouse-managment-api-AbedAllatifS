@@ -1,0 +1,57 @@
+[33ma1432a8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32msession-07-firebase-auth-minio-storage[m[33m)[m Register WarehouseFile DbSet in WarehouseDbContext
+[33mc773359[m Add SetUserRoleRequest DTO and FirebaseAdmin
+[33m36d0e4b[m Step 4: Apply policies to controllers
+[33m5f817f8[m Add MinIO to docker-compose
+[33m59a04ca[m Add endpoint Firebase custom role claims
+[33m681fa0b[m Add Files controller endpoints
+[33m42a987e[m Add WarehouseFiles table migration
+[33m73883f3[m Add MinIO storage and metadata
+[33m96ab01f[m Add Firebase JWT bearer authentication
+[33m630a471[m[33m ([m[1;31morigin/session-06-observability-performance[m[33m, [m[1;32msession-06-observability-performance[m[33m)[m feat(session-06): implement background jobs
+[33m3e33623[m feat(session-06): add health checks
+[33m43cb417[m feat(session-06): implement redis caching
+[33mdb53350[m feat(session-06): configure structured logging
+[33mcecb4d7[m fixed server error
+[33m8d2258e[m feat(session-06): add localization
+[33m6eb1bcd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #7 from abed0srour/session-05-advanced-dotnet-hardening
+[33md30a3ec[m[33m ([m[1;31morigin/session-05-advanced-dotnet-hardening[m[33m, [m[1;32msession-05-advanced-dotnet-hardening[m[33m)[m a
+[33m94978d2[m B Merge remote-tracking branch 'origin/main' into session-05-advanced-dotnet-hardening
+[33mc542f53[m fix: resolving comments
+[33m22c6cb0[m feat(session-05): add reflection-based validation metadata endpoint
+[33m0afa091[m feat(session-05): add generic IRepository<T> to reduce duplication
+[33m22ff29f[m feat(session-05): add inventory dashboard endpoint with Task.WhenAll and DbContext factory
+[33m7049ff7[m chore(session-05): review async code - no blocking calls found, CancellationToken review pending
+[33m5263b4f[m feat(session-05): add mvc filters (action logging and model validation)
+[33m179f797[m feat(session-05): add request middleware (correlation id and timing)
+[33m57f1f7b[m feat(session-05): add exception handling middleware
+[33m722c595[m feat(session-05): add custom exceptions and validation rules
+[33mfd80779[m feat(session-05): add validation rules
+[33mb4fac36[m Merge pull request #6 from abed0srour/session-04-database-connection-db-first
+[33m968931b[m[33m ([m[1;31morigin/session-04-database-connection-db-first[m[33m, [m[1;32msession-04-database-connection-db-first[m[33m)[m fix: resolving the comments
+[33mf6191e4[m[33m ([m[1;31morigin/session-03-ddd-architecture[m[33m)[m Merge pull request #4 from abed0srour/session-04-database-connection-db-first
+[33m2c33951[m Merge pull request #3 from abed0srour/session-03-ddd-architecture
+[33m22e9ac9[m[33m ([m[1;31morigin/session-04-database-connection-code-first[m[33m, [m[1;32msession-04-database-connection-code-first[m[33m)[m fix(presentation): update controller endpoints and clean up request payloads
+[33mc9e8f69[m feat(session-04): migrate product and supplier repositories to use ef core
+[33m2dce90e[m feat(session-04): generate initial EF Core migration and update database
+[33m9680ab1[m feat(session-04): install EF Core PostgreSQL packages and configure domain models
+[33m5d68a8f[m feat(session-04): adding db-first controller
+[33mefd7026[m feat(session-04): add LINQ queries
+[33m5d41931[m feat(session-04): db first scaffolding
+[33m43a1027[m[33m ([m[1;32msession-03-ddd-architecture[m[33m)[m chore: remove redundant root-level files
+[33m7bf1813[m fix: explicit record of new DDD project structure
+[33ma53e327[m fix: resolve .gitignore conflict
+[33m4d41386[m fix: resolve nested git repository
+[33ma2bd43a[m fix: resolve project path references and fix Swagger UI definition loading
+[33mdb2fc37[m Refactor: Restructure to clean DDD template, downgrade to .net 8, fix presentation layer
+[33m2ae6d55[m Refactor: Restructure to clean DDD template, downgrade to .net 8, fix presentation layer
+[33mdd10189[m[33m ([m[1;31morigin/session-02-first-api[m[33m)[m chore: track launchSettings.json for instructor review
+[33m6b7a60d[m[33m ([m[1;31morigin/session-03-ddd-architecture-new[m[33m, [m[1;32msession-03-ddd-architecture-new[m[33m)[m Merge pull request #1 from abed0srour/session-02-first-api
+[33m40c9b54[m docs and chore: update project readme, add scalar UI, and configure project dependencies
+[33m1601980[m feat(session-02): complete advanced validations for archived products
+[33mf6acb92[m docs: add repository readme guide
+[33m353694a[m chore: add gitignore rules and remove untracked local environment configurations
+[33m585b546[m feat(session-02): implement supplier module models services and endpoints
+[33mf551194[m feat(session-02): implement product controller endpoints
+[33m1d4d0fd[m feat(session-02): add in-memory warehouse store
+[33me2b1985[m feat(session-02): create product entities and contracts
+[33m5201dfe[m Initial commit with solution and Web API

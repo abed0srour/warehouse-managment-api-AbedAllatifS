@@ -1,39 +1,43 @@
-# Warehouse Management API
+# Session 2
 
-This is an ASP.NET Core Web API built for tracking products and managing inventory data.
+Built products and suppliers 
 
-## Getting Started
-1. Clone the repository.
-2. Run `dotnet build` to restore dependencies.
-3. Run `dotnet run` to launch the development server.
-4. View OpenAPI documentation at `/openapi/v1.json` or use tools like Swagger UI, Postman, or VS Code REST Client to interact with the API.
+# Session 3 
 
-## Session 02 — Inventory API Implementation
-Implemented features:
-- Product CRUD operations with in-memory data storage
-- Search products by name and supplier (partial, case-insensitive)
-- Optional available-only product filtering
-- Soft delete products via `IsArchived`
-- Product image upload with JPG/PNG and 2 MB limit
-- Supplier endpoints and assign supplier to a product
-- Server time endpoint with language-aware formatting
-- Swagger UI for interactive API documentation
+Split the one folder project into layers: Domain, Application, Infrastructure, Presentation layers.
+Rules like (price cant be zero, archived products cant be edited) moved into the Domain layer (buisness logic layer)
+Controllers became smaller, pass requests along them, no logic inside them (moved into domain layer)
 
-## API Endpoints
-- `GET /api/products`
-- `GET /api/products?onlyAvailable=true`
-- `GET /api/products/{id}`
-- `GET /api/products/search?name=...&supplier=...`
-- `POST /api/products`
-- `POST /api/products/{id}/quantity`
-- `POST /api/products/{id}/price`
-- `POST /api/products/{id}/image`
-- `DELETE /api/products/{id}`
-- `GET /api/products/server-time`
-- `POST /api/products/{id}/assign-supplier/{supplierId}`
-- `GET /api/suppliers`
-- `GET /api/suppliers/{id}`
-- `POST /api/suppliers`
-- `DELETE /api/suppliers/{id}`
+# Session 4 
 
+Connected the API to Postgres using ef core
+Tried two approaches: database-first (build DB, generate code) and code-first (write code, generate DB)
+Added LINQ queries — grouping products by expiry year, filtering by supplier, pagination
+Used AutoMapper to return clean view models instead of raw database entities
 
+# Session 5 
+
+Added a consistent error format so failures always look the same to the client
+Added custom exceptions (not found, business rule errors) instead of generic ones
+Added validation on incoming requests
+Added middleware to catch unhandled errors and return safe messages
+Added middleware to tag every request with an ID and track how long it took
+Added filters for logging and model validation
+Cleaned up async code so nothing blocks unnecessarily
+Added a dashboard endpoint that runs multiple things at once
+
+# Session 6
+
+Added support for multiple languages
+Added structured logging saved to files (Serilog)
+Added Redis caching so repeated requests dont always hit the database
+Added a /health endpoint to check if database and Redis are alive
+Added a daily background job that checks for expired/expiring products
+
+# Session 7 
+
+Firebase checks who is logging in and hands back a token
+The API reads a role from that token (onlyadmin or regular user) to decide what someone can do
+MinIO stores actual files (product images)
+The database only stores info about the file
+Admins can upload/delete files, everyone signed in can view or download them

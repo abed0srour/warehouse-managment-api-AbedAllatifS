@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Warehouse.Application.Common;
 using Warehouse.Application.Suppliers;
@@ -20,6 +21,7 @@ public class SuppliersController : ControllerBase
     }
 
     // GET /api/suppliers
+    [Authorize(Policy = "AuthenticatedUser")]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<SupplierViewModel>>> GetAll(CancellationToken cancellationToken)
     {
@@ -28,6 +30,7 @@ public class SuppliersController : ControllerBase
     }
 
     // GET /api/suppliers/{id}
+    [Authorize(Policy = "AuthenticatedUser")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SupplierViewModel>> GetById(Guid id, CancellationToken cancellationToken)
     {
@@ -41,6 +44,7 @@ public class SuppliersController : ControllerBase
     }
 
     // POST /api/suppliers
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost]
     public async Task<ActionResult<SupplierViewModel>> Create([FromBody] CreateSupplierRequest request, CancellationToken cancellationToken)
     {
@@ -59,6 +63,7 @@ public class SuppliersController : ControllerBase
     }
 
     // DELETE /api/suppliers/{id} - deactivate, not remove
+    [Authorize(Policy = "AdminOnly")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
     {

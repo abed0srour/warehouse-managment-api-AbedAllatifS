@@ -2,8 +2,10 @@ namespace Warehouse.Application.Products.Queries;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Warehouse.Domain;
@@ -14,15 +16,25 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
+    private readonly IDistributedCache _cache;
 
-    public GetAllProductsQueryHandler(IProductRepository productRepository, IMapper mapper)
+    public GetAllProductsQueryHandler(IProductRepository productRepository, IMapper mapper, IDistributedCache cache)
     {
         _productRepository = productRepository;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<IEnumerable<ProductViewModel>> Handle(GetAllProductsQuery request, CancellationToken cancellationToken)
     {
+        var cacheKey = $"products:all:{request.OnlyAvailable}";
+
+        var cachedValue = await _cache.GetStringAsync(cacheKey, cancellationToken);
+        if (cachedValue != null)
+        {
+            return JsonSerializer.Deserialize<IEnumerable<ProductViewModel>>(cachedValue) ?? Enumerable.Empty<ProductViewModel>();
+        }
+
         var products = await _productRepository.GetAllAsync(cancellationToken);
 
         var query = products.AsEnumerable();
@@ -34,6 +46,17 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
 
         var ordered = query.OrderByDescending(p => p.CreatedAt).ToList();
 
-        return _mapper.Map<IEnumerable<ProductViewModel>>(ordered);
+        var result = _mapper.Map<IEnumerable<ProductViewModel>>(ordered);
+
+        await _cache.SetStringAsync(
+            cacheKey,
+            JsonSerializer.Serialize(result),
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            },
+            cancellationToken);
+
+        return result;
     }
 }

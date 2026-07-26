@@ -2,6 +2,7 @@ namespace Warehouse.Application.Products.Commands;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
@@ -15,13 +16,16 @@ public class UpdateProductPriceCommandHandler : IRequestHandler<UpdateProductPri
 {
     private readonly IProductRepository _productRepository;
     private readonly ILogger<UpdateProductPriceCommandHandler> _logger;
+    private readonly IDistributedCache _cache;
 
     public UpdateProductPriceCommandHandler(
         IProductRepository productRepository,
-        ILogger<UpdateProductPriceCommandHandler> logger)
+        ILogger<UpdateProductPriceCommandHandler> logger,
+        IDistributedCache cache)
     {
         _productRepository = productRepository;
         _logger = logger;
+        _cache = cache;
     }
 
     public async Task<Product?> Handle(UpdateProductPriceCommand request, CancellationToken cancellationToken)
@@ -33,6 +37,10 @@ public class UpdateProductPriceCommandHandler : IRequestHandler<UpdateProductPri
 
         product.UpdatePrice(request.NewPrice);
         await _productRepository.UpdateAsync(product, cancellationToken);
+
+        await _cache.RemoveAsync("products:all:True", cancellationToken);
+        await _cache.RemoveAsync("products:all:False", cancellationToken);
+        await _cache.RemoveAsync($"products:{request.Id}", cancellationToken);
 
         _logger.LogInformation(
             "Product {ProductId} price changed from {OldPrice} to {NewPrice}",

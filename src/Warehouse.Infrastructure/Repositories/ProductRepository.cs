@@ -71,9 +71,12 @@ public class ProductRepository : IProductRepository
         QuantityInStock = product.QuantityInStock,
         SupplierName = product.SupplierName,
         SupplierId = product.SupplierId,
-        ExpiryDate = product.ExpiryDate,
+        ExpiryDate = AsUnspecified(product.ExpiryDate),
         IsArchived = product.IsArchived,
-        CreatedAt = product.CreatedAt,
-        LastUpdatedAt = product.LastUpdatedAt ?? product.CreatedAt
+        CreatedAt = DateTime.SpecifyKind(product.CreatedAt, DateTimeKind.Unspecified),
+        LastUpdatedAt = AsUnspecified(product.LastUpdatedAt)
     };
+
+    private static DateTime? AsUnspecified(DateTime? value) =>
+        value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Unspecified) : null;
 }

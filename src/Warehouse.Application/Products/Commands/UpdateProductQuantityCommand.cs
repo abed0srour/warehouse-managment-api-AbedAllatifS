@@ -2,6 +2,7 @@ namespace Warehouse.Application.Products.Commands;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,11 +15,13 @@ public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProduct
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
+    private readonly IDistributedCache _cache;
 
-    public UpdateProductQuantityCommandHandler(IProductRepository productRepository, IMapper mapper)
+    public UpdateProductQuantityCommandHandler(IProductRepository productRepository, IMapper mapper, IDistributedCache cache)
     {
         _productRepository = productRepository;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<Product?> Handle(UpdateProductQuantityCommand request, CancellationToken cancellationToken)
@@ -28,6 +31,11 @@ public class UpdateProductQuantityCommandHandler : IRequestHandler<UpdateProduct
 
         product.UpdateQuantity(request.NewQuantity);
         await _productRepository.UpdateAsync(product, cancellationToken);
+
+        await _cache.RemoveAsync("products:all:True", cancellationToken);
+        await _cache.RemoveAsync("products:all:False", cancellationToken);
+        await _cache.RemoveAsync($"products:{request.Id}", cancellationToken);
+
         return product;
     }
 }

@@ -2,6 +2,7 @@ namespace Warehouse.Application.Products.Commands;
 
 using AutoMapper;
 using MediatR;
+using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,11 +15,13 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
 {
     private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
+    private readonly IDistributedCache _cache;
 
-    public ArchiveProductCommandHandler(IProductRepository productRepository, IMapper mapper)
+    public ArchiveProductCommandHandler(IProductRepository productRepository, IMapper mapper, IDistributedCache cache)
     {
         _productRepository = productRepository;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<Result<ProductViewModel>> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
@@ -31,6 +34,10 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
 
         product.Archive();
         await _productRepository.UpdateAsync(product, cancellationToken);
+
+        await _cache.RemoveAsync("products:all:True", cancellationToken);
+        await _cache.RemoveAsync("products:all:False", cancellationToken);
+        await _cache.RemoveAsync($"products:{request.Id}", cancellationToken);
 
         return Result.Success(_mapper.Map<ProductViewModel>(product));
     }

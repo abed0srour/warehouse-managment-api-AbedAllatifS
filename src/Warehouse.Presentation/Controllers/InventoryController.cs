@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Warehouse.Application.Inventory.Queries;
 
@@ -14,7 +15,7 @@ public class InventoryController : ControllerBase
     {
         _mediator = mediator;
     }
-
+    [Authorize(Policy = "AuthenticatedUser")]   
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
