@@ -41,3 +41,14 @@ The API reads a role from that token (onlyadmin or regular user) to decide what 
 MinIO stores actual files (product images)
 The database only stores info about the file
 Admins can upload/delete files, everyone signed in can view or download them
+
+# SEssion 8
+Identified Notification Events: stock quantity becomes lower than a configured threshold and a supplier document or warehouse file is uploaded to MinIO 
+created Events:
+    IntegrationEvent: abstract base class with fields common to every event
+    StockLowDetected 
+    WarehouseFileUploaded 
+both main warehouse project and the notifications service (Warehouse.Notifications.Infrastructure) reference the same physical Warehouse.Domain.csproj project to access these exact classes. deserialize messages into these exact shapes.
+warehouse API publishes integration events to RabbitMQ
+
+# Session 9
