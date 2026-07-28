@@ -44,13 +44,11 @@ Admins can upload/delete files, everyone signed in can view or download them
 
 # SEssion 8
 Identified Notification Events: stock quantity becomes lower than a configured threshold and a supplier document or warehouse file is uploaded to MinIO 
-Add RabbitMQ with Docker Compose: 
-    Console: http://localhost:15672
-    Username: warehouse
-    Password: warehouse
 created Events:
     IntegrationEvent: abstract base class with fields common to every event
     StockLowDetected 
     WarehouseFileUploaded 
-both main warehouse project and Warehouse.Notifications.Api reference the same physical Warehouse.Domain.csproj project to access these exact classes. deserialize messages into these exact shapes.
+both main warehouse project and the notifications service (Warehouse.Notifications.Infrastructure) reference the same physical Warehouse.Domain.csproj project to access these exact classes. deserialize messages into these exact shapes.
 warehouse API publishes integration events to RabbitMQ
+
+# Session 9

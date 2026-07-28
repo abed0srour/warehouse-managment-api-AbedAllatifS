@@ -34,6 +34,8 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .CreateLogger();
 
+LoadEnvFile();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
@@ -254,4 +256,42 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static void LoadEnvFile()
+{
+    var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+    while (directory is not null && !File.Exists(Path.Combine(directory.FullName, ".env")))
+    {
+        directory = directory.Parent;
+    }
+
+    if (directory is null)
+    {
+        return;
+    }
+
+    foreach (var line in File.ReadAllLines(Path.Combine(directory.FullName, ".env")))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+        {
+            continue;
+        }
+
+        var separatorIndex = trimmed.IndexOf('=');
+        if (separatorIndex <= 0)
+        {
+            continue;
+        }
+
+        var key = trimmed[..separatorIndex].Trim();
+        var value = trimmed[(separatorIndex + 1)..].Trim();
+
+        if (Environment.GetEnvironmentVariable(key) is null)
+        {
+            Environment.SetEnvironmentVariable(key, value);
+        }
+    }
 }
