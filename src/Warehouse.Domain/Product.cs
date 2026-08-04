@@ -106,6 +106,8 @@ public class Product
 
     public void AssignSupplier(Supplier supplier)
     {
+        ArgumentNullException.ThrowIfNull(supplier);
+
         if (IsArchived)
             throw new InvalidOperationException("Archived products cannot be updated.");
 
