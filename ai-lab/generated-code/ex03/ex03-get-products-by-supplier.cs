@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Infrastructure.Queries;
 
@@ -7,8 +7,6 @@ namespace Warehouse.Api.UnitTests.Queries;
 public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
 {
     private GetProductsBySupplierQueryHandler CreateHandler() => new(Context, Mapper);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_MatchesOnDenormalisedSupplierName()
@@ -25,8 +23,6 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_MatchesOnRelatedSupplierName()
     {
-        // The predicate also matches through the navigation property, so a product whose
-        // denormalised SupplierName is stale still resolves via its FK.
         var supplier = MakeSupplier("Acme");
         await SeedAsync(supplier, MakeProduct("Mouse", "SKU-0001", supplierName: null, supplierId: supplier.SupplierId));
 
@@ -97,8 +93,6 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
         result.Should().HaveCount(2);
     }
 
-    // ---------- negative ----------
-
     [Fact]
     public async Task Handle_UnknownSupplier_ReturnsEmpty()
     {
@@ -120,9 +114,6 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_NullSortOrder_ThrowsNullReference()
     {
-        // DEFECT: SortOrder has a default of "desc" but is never null-checked. A caller that
-        // binds ?sortOrder= to an explicit null (or any client that passes null) gets a
-        // NullReferenceException from request.SortOrder.ToLower() -- a 500, not a 400.
         await SeedAsync(MakeProduct("Mouse", "SKU-0001", supplierName: "Acme"));
 
         var act = async () => await CreateHandler().Handle(
@@ -135,9 +126,6 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_NullSupplierName_ReturnsProductsWithNullSupplier()
     {
-        // DEFECT: a null SupplierName is not rejected; it matches every product whose
-        // denormalised SupplierName is also null, which is a surprising result for a
-        // "find by supplier" query.
         await SeedAsync(
             MakeProduct("Orphan", "SKU-0001", supplierName: null),
             MakeProduct("Owned", "SKU-0002", supplierName: "Acme"));
@@ -160,16 +148,12 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_SupplierNameMatchIsCaseSensitive()
     {
-        // Worth pinning: the name comparison is exact, unlike the sort-order comparison
-        // right below it, which is lowercased. "acme" does not find "Acme".
         await SeedAsync(MakeProduct("Mouse", "SKU-0001", supplierName: "Acme"));
 
         var result = await CreateHandler().Handle(new GetProductsBySupplierQuery("acme"), CancellationToken.None);
 
         result.Should().BeEmpty();
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_MaxLengthSupplierName_MatchesExactly()
@@ -195,10 +179,10 @@ public class GetProductsBySupplierQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_UnicodeSupplierName_MatchesExactly()
     {
-        await SeedAsync(MakeProduct("Mouse", "SKU-0001", supplierName: "Zürich Imports"));
+        await SeedAsync(MakeProduct("Mouse", "SKU-0001", supplierName: "Zأ¼rich Imports"));
 
         var result = await CreateHandler().Handle(
-            new GetProductsBySupplierQuery("Zürich Imports"),
+            new GetProductsBySupplierQuery("Zأ¼rich Imports"),
             CancellationToken.None);
 
         result.Should().ContainSingle();

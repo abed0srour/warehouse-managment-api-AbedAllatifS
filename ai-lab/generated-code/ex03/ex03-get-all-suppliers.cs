@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using FluentAssertions;
 using Moq;
 using Warehouse.Application.Suppliers;
@@ -31,8 +31,6 @@ public class GetAllSuppliersQueryHandlerTests
 
     private void GivenSuppliers(params Supplier[] suppliers) =>
         _supplierRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(suppliers);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_ReturnsAllSuppliers()
@@ -74,7 +72,6 @@ public class GetAllSuppliersQueryHandlerTests
     [Fact]
     public async Task Handle_IncludesInactiveSuppliers()
     {
-        // This query applies no filtering -- deactivated suppliers are still listed.
         GivenSuppliers(
             new Supplier { Name = "Active", IsActive = true },
             new Supplier { Name = "Inactive", IsActive = false });
@@ -84,8 +81,6 @@ public class GetAllSuppliersQueryHandlerTests
         result.Should().HaveCount(2);
         result.Should().Contain(s => !s.IsActive);
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_NoSuppliers_ReturnsEmptyCollection()
@@ -119,8 +114,6 @@ public class GetAllSuppliersQueryHandlerTests
         _supplierRepository.Verify(r => r.GetAllAsync(cts.Token), Times.Once);
     }
 
-    // ---------- edge cases ----------
-
     [Fact]
     public async Task Handle_MaxLengthSupplierName_IsPreservedIntact()
     {
@@ -148,10 +141,10 @@ public class GetAllSuppliersQueryHandlerTests
     [Fact]
     public async Task Handle_UnicodeCountryNames_ArePreserved()
     {
-        GivenSuppliers(new Supplier { Name = "Zürich Imports", Country = "Côte d'Ivoire" });
+        GivenSuppliers(new Supplier { Name = "Zأ¼rich Imports", Country = "Cأ´te d'Ivoire" });
 
         var result = await _handler.Handle(new GetAllSuppliersQuery(), CancellationToken.None);
 
-        result.Single().Country.Should().Be("Côte d'Ivoire");
+        result.Single().Country.Should().Be("Cأ´te d'Ivoire");
     }
 }

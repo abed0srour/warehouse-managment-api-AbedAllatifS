@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using AutoMapper;
 using FluentAssertions;
@@ -19,8 +19,6 @@ public class GetProductByIdQueryHandlerTests
 
     public GetProductByIdQueryHandlerTests()
     {
-        // Default to a cache MISS -- see the note in GetAllProductsQueryHandlerTests:
-        // Moq hands back an empty byte[], which GetStringAsync turns into "" rather than null.
         _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
@@ -42,8 +40,6 @@ public class GetProductByIdQueryHandlerTests
 
         _handler = new GetProductByIdQueryHandler(_productRepository.Object, _mapper.Object, _cache.Object);
     }
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_ExistingProduct_ReturnsMappedViewModel()
@@ -95,8 +91,6 @@ public class GetProductByIdQueryHandlerTests
     [Fact]
     public async Task Handle_ArchivedProduct_IsStillReturned()
     {
-        // Archived products remain readable by id; archiving hides them from availability
-        // filters, it is not a delete.
         var product = Product.Create("Retired", "SKU-001", 10m, 5);
         product.Archive();
         _productRepository.Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
@@ -107,8 +101,6 @@ public class GetProductByIdQueryHandlerTests
         result.Should().NotBeNull();
         result!.IsArchived.Should().BeTrue();
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_MissingProduct_ReturnsNull()
@@ -124,9 +116,6 @@ public class GetProductByIdQueryHandlerTests
     [Fact]
     public async Task Handle_MissingProduct_CachesTheNegativeResult()
     {
-        // The handler caches "null" for 5 minutes. A product created moments after this
-        // lookup stays invisible until that entry expires -- deliberate or not, it is the
-        // current behaviour and worth pinning down.
         _productRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Product?)null);
 
@@ -186,8 +175,6 @@ public class GetProductByIdQueryHandlerTests
         await act.Should().ThrowAsync<JsonException>();
     }
 
-    // ---------- edge cases ----------
-
     [Fact]
     public async Task Handle_MaxLengthDescription_SurvivesSerializationRoundTrip()
     {
@@ -204,20 +191,18 @@ public class GetProductByIdQueryHandlerTests
     [Fact]
     public async Task Handle_UnicodeAndControlCharactersInName_AreSerializedSafely()
     {
-        var product = Product.Create("Ünïcødé \"quoted\" \\ backslash", "SKU-001", 10m, 5);
+        var product = Product.Create("أœnأ¯cأ¸dأ© \"quoted\" \\ backslash", "SKU-001", 10m, 5);
         _productRepository.Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
 
         var result = await _handler.Handle(new GetProductByIdQuery(product.Id), CancellationToken.None);
 
-        result!.Name.Should().Be("Ünïcødé \"quoted\" \\ backslash");
+        result!.Name.Should().Be("أœnأ¯cأ¸dأ© \"quoted\" \\ backslash");
     }
 
     [Fact]
     public async Task Handle_ExpiryDateAtYearBoundary_IsReturnedUnshifted()
     {
-        // The codebase stores DateTimeKind.Unspecified throughout. Serializing to cache and
-        // back must not shift the instant across the year boundary.
         var product = Product.Create("Milk", "SKU-001", 10m, 5);
         product.ExpiryDate = DateTime.SpecifyKind(new DateTime(2025, 12, 31, 23, 59, 59), DateTimeKind.Unspecified);
         _productRepository.Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))

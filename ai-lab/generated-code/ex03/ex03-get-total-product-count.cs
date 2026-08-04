@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Infrastructure.Queries;
 
@@ -7,8 +7,6 @@ namespace Warehouse.Api.UnitTests.Queries;
 public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
 {
     private GetTotalProductCountQueryHandler CreateHandler() => new(Context);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_ReturnsNumberOfProducts()
@@ -26,8 +24,6 @@ public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_CountsArchivedProductsToo()
     {
-        // The count is unfiltered, so it does not match what the "only available" product
-        // list returns. Consumers pairing the two will see inconsistent totals.
         await SeedAsync(
             MakeProduct("Active", "SKU-0001"),
             MakeProduct("Archived", "SKU-0002", archived: true));
@@ -48,8 +44,6 @@ public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
 
         result.Should().Be(2);
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_EmptyDatabase_ReturnsZero()
@@ -74,7 +68,6 @@ public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_DisposedContext_ThrowsObjectDisposed()
     {
-        // Infrastructure failure: the scoped DbContext is gone underneath the handler.
         var handler = CreateHandler();
         Context.Dispose();
 
@@ -82,8 +75,6 @@ public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
 
         await act.Should().ThrowAsync<ObjectDisposedException>();
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_LargeCatalogue_ReturnsExactCount()
@@ -101,9 +92,6 @@ public class GetTotalProductCountQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_ReturnTypeIsInt32_WhichCapsAtMaxValue()
     {
-        // Documents the contract rather than the data: the query returns Int32, so a
-        // catalogue larger than int.MaxValue rows could not be represented. CountAsync
-        // would throw on overflow rather than wrap, but the ceiling is worth recording.
         await SeedAsync(MakeProduct("A", "SKU-0001"));
 
         var result = await CreateHandler().Handle(new GetTotalProductCountQuery(), CancellationToken.None);

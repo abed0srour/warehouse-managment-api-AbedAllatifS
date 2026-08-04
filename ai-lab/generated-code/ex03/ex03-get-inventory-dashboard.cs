@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using Warehouse.Application.Inventory.Queries;
 using Warehouse.Domain;
@@ -34,8 +34,6 @@ public class GetInventoryDashboardQueryHandlerTests
 
     private void GivenSuppliers(params Supplier[] suppliers) =>
         _supplierRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(suppliers);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_ReturnsTotalProductCount()
@@ -102,12 +100,9 @@ public class GetInventoryDashboardQueryHandlerTests
         result.LowStockProducts.Should().ContainSingle().Which.Name.Should().Be("ActiveLow");
     }
 
-    // ---------- boundary ----------
-
     [Fact]
     public async Task Handle_QuantityExactlyAtThreshold_IsNotLowStock()
     {
-        // The predicate is strict "<", so a product sitting exactly on the threshold is healthy.
         GivenProducts(MakeProduct("Exactly10", 10));
 
         var result = await _handler.Handle(new GetInventoryDashboardQuery(LowStockThreshold: 10), CancellationToken.None);
@@ -134,8 +129,6 @@ public class GetInventoryDashboardQueryHandlerTests
 
         result.LowStockProducts.Should().ContainSingle().Which.QuantityInStock.Should().Be(0);
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_NoData_ReturnsZeroedDashboard()
@@ -172,8 +165,6 @@ public class GetInventoryDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_NegativeThreshold_ReturnsNoLowStockProducts()
     {
-        // No validation exists on LowStockThreshold. A negative threshold silently yields
-        // an empty low-stock list rather than being rejected.
         GivenProducts(MakeProduct("OutOfStock", 0), MakeProduct("Low", 1));
 
         var result = await _handler.Handle(new GetInventoryDashboardQuery(LowStockThreshold: -1), CancellationToken.None);
@@ -191,8 +182,6 @@ public class GetInventoryDashboardQueryHandlerTests
 
         result.LowStockProducts.Should().BeEmpty();
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_MaxIntThreshold_FlagsEveryActiveProductWithoutOverflow()
@@ -225,7 +214,7 @@ public class GetInventoryDashboardQueryHandlerTests
         var result = await _handler.Handle(new GetInventoryDashboardQuery(), CancellationToken.None);
 
         result.TotalProducts.Should().Be(10_000);
-        result.LowStockProducts.Should().HaveCount(10); // quantities 0..9
+        result.LowStockProducts.Should().HaveCount(10);
     }
 
     [Fact]

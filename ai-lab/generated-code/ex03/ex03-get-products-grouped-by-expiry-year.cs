@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Infrastructure.Queries;
 
@@ -10,8 +10,6 @@ public class GetProductsGroupedByExpiryYearQueryHandlerTests : EfQueryHandlerTes
 
     private static DateTime Unspecified(int year, int month, int day, int hour = 0, int minute = 0, int second = 0) =>
         DateTime.SpecifyKind(new DateTime(year, month, day, hour, minute, second), DateTimeKind.Unspecified);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_GroupsProductsByExpiryYear()
@@ -88,8 +86,6 @@ public class GetProductsGroupedByExpiryYearQueryHandlerTests : EfQueryHandlerTes
         result.Single().TotalProducts.Should().Be(1);
     }
 
-    // ---------- negative ----------
-
     [Fact]
     public async Task Handle_EmptyDatabase_ReturnsNoGroups()
     {
@@ -134,8 +130,6 @@ public class GetProductsGroupedByExpiryYearQueryHandlerTests : EfQueryHandlerTes
         await act.Should().ThrowAsync<ObjectDisposedException>();
     }
 
-    // ---------- edge cases: timezone / year boundary ----------
-
     [Fact]
     public async Task Handle_LastInstantOfYear_GroupsIntoThatYear()
     {
@@ -173,11 +167,6 @@ public class GetProductsGroupedByExpiryYearQueryHandlerTests : EfQueryHandlerTes
     [Fact]
     public async Task Handle_GroupingUsesStoredValueWithNoTimezoneConversion()
     {
-        // The grouping key is the raw stored DateTime's Year. Nothing converts to UTC or to
-        // the request's local zone, so a product expiring at 23:30 on Dec 31 is filed under
-        // the earlier year even though it is already January in any zone east of the
-        // storage zone. This is consistent with the codebase storing DateTimeKind.Unspecified
-        // everywhere, but it means "expiring in 2025" is zone-relative and undefined.
         var lateOnNewYearsEve = Unspecified(2025, 12, 31, 23, 30, 0);
         await SeedAsync(MakeProduct("Edge", "SKU-0001", expiryDate: lateOnNewYearsEve));
 
@@ -190,8 +179,6 @@ public class GetProductsGroupedByExpiryYearQueryHandlerTests : EfQueryHandlerTes
     [Fact]
     public async Task Handle_UtcKindExpiryDate_IsGroupedByItsRawYearNotConverted()
     {
-        // Same point, made with an explicitly-UTC value: 2025-12-31T23:30Z is 2026 in CET,
-        // but the handler still reports 2025 because it never converts.
         await SeedAsync(MakeProduct("Edge", "SKU-0001",
             expiryDate: DateTime.SpecifyKind(new DateTime(2025, 12, 31, 23, 30, 0), DateTimeKind.Utc)));
 

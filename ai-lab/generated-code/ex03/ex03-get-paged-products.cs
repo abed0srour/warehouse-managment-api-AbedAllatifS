@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Infrastructure.Queries;
 
@@ -16,8 +16,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
             .ToArray();
         await SeedAsync(products);
     }
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_FirstPage_ReturnsRequestedPageSize()
@@ -91,8 +89,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
         result.Items.Should().Contain(p => p.IsArchived);
     }
 
-    // ---------- negative ----------
-
     [Fact]
     public async Task Handle_EmptyDatabase_ReturnsEmptyPageWithZeroTotal()
     {
@@ -116,8 +112,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_PageSizeZero_ReturnsNoItems()
     {
-        // DEFECT: PageSize is not validated. Zero silently yields an empty page instead of
-        // a 400. The caller cannot distinguish this from "no data".
         await SeedProductsAsync(10);
 
         var result = await CreateHandler().Handle(new GetPagedProductsQuery(1, 0), CancellationToken.None);
@@ -129,8 +123,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_PageNumberZero_SilentlyBehavesAsFirstPage()
     {
-        // DEFECT: PageNumber is not validated. (0 - 1) * 10 = -10, and Skip(-10) is treated
-        // as Skip(0) by LINQ, so page 0 quietly returns page 1 rather than being rejected.
         await SeedProductsAsync(10);
 
         var result = await CreateHandler().Handle(new GetPagedProductsQuery(0, 5), CancellationToken.None);
@@ -142,7 +134,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_NegativePageNumber_SilentlyBehavesAsFirstPage()
     {
-        // DEFECT: same root cause -- a negative Skip is clamped to zero rather than rejected.
         await SeedProductsAsync(10);
 
         var result = await CreateHandler().Handle(new GetPagedProductsQuery(-5, 5), CancellationToken.None);
@@ -153,9 +144,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_NegativePageSize_SilentlyReturnsNoItems()
     {
-        // DEFECT: a negative Take is clamped to zero by LINQ rather than rejected, so a
-        // nonsense page size returns an empty page that is indistinguishable from "no data"
-        // -- while TotalCount still reports rows exist.
         await SeedProductsAsync(10);
 
         var result = await CreateHandler().Handle(new GetPagedProductsQuery(1, -5), CancellationToken.None);
@@ -164,15 +152,9 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
         result.TotalCount.Should().Be(10);
     }
 
-    // ---------- edge cases: integer overflow ----------
-
     [Fact]
     public async Task Handle_MaxIntPageNumber_OverflowsSkipAndReturnsFirstPage()
     {
-        // DEFECT (integer overflow): (int.MaxValue - 1) * 10 does not fit in an Int32.
-        // C# arithmetic is unchecked by default, so it wraps to -20, Skip(-20) clamps to 0,
-        // and the "last page in the universe" silently returns the FIRST page of data.
-        // A caller paging with a corrupted page number gets plausible-looking wrong results.
         await SeedProductsAsync(20);
 
         var result = await CreateHandler().Handle(
@@ -186,7 +168,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_MaxIntPageSize_DoesNotOverflowOnFirstPage()
     {
-        // Page 1 is safe regardless of PageSize, because (1 - 1) * PageSize is always 0.
         await SeedProductsAsync(10);
 
         var result = await CreateHandler().Handle(
@@ -200,8 +181,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
     [Fact]
     public async Task Handle_LargePageNumberAndSizeCombination_Overflows()
     {
-        // DEFECT: 100_000 * 100_000 = 10^10, far beyond Int32. Wraps to 1_410_065_408,
-        // a positive value, so this one skips a nonsense number of rows instead of clamping.
         await SeedProductsAsync(5);
 
         var result = await CreateHandler().Handle(
@@ -211,8 +190,6 @@ public class GetPagedProductsQueryHandlerTests : EfQueryHandlerTestBase
         result.Items.Should().BeEmpty();
         result.TotalCount.Should().Be(5);
     }
-
-    // ---------- edge cases: data ----------
 
     [Fact]
     public async Task Handle_MaxLengthProductName_SurvivesProjection()

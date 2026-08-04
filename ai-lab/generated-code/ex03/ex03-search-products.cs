@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -45,11 +45,6 @@ public class SearchProductsQueryHandlerTests
         return product;
     }
 
-    /// <summary>
-    /// Builds a product bypassing the <see cref="Product.Create"/> invariants, for states the
-    /// factory refuses to produce (archived, null name, explicit timestamps, extreme quantities)
-    /// but which the database can hand back to the handler at runtime.
-    /// </summary>
     private static Product Reconstruct(
         string name,
         string sku,
@@ -76,10 +71,6 @@ public class SearchProductsQueryHandlerTests
     private void GivenProducts(params Product[] products) =>
         _productRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(products);
 
-    /// <summary>
-    /// A handler wired to the application's real AutoMapper profile rather than the stub, so the
-    /// mapping-fidelity tests assert what production actually does instead of what the stub does.
-    /// </summary>
     private SearchProductsQueryHandler HandlerWithRealMapper()
     {
         var configuration = new MapperConfiguration(
@@ -88,8 +79,6 @@ public class SearchProductsQueryHandlerTests
 
         return new SearchProductsQueryHandler(_productRepository.Object, configuration.CreateMapper());
     }
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_SearchByName_ReturnsMatches()
@@ -227,7 +216,6 @@ public class SearchProductsQueryHandlerTests
 
         await _handler.Handle(new SearchProductsQuery("Wireless", null), CancellationToken.None);
 
-        // Filtering happens before projection, so mapping cost scales with matches, not table size.
         _mapper.Verify(m => m.Map<ProductViewModel>(It.IsAny<Product>()), Times.Once);
     }
 
@@ -241,13 +229,9 @@ public class SearchProductsQueryHandlerTests
         _ = result.ToList();
         _ = result.ToList();
 
-        // The handler calls ToList(), so re-enumerating the result cannot re-run the repository
-        // call or the mapper. Returning a lazy IEnumerable here would make both happen per read.
         _productRepository.Verify(r => r.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
         _mapper.Verify(m => m.Map<ProductViewModel>(It.IsAny<Product>()), Times.Once);
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_EmptyRepository_ReturnsEmptyCollection()
@@ -295,9 +279,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_RepositoryReturnsNull_ThrowsArgumentNullException()
     {
-        // DEFECT: the handler never null-checks the repository result. A repository
-        // implementation that returns null on a degraded read surfaces as an opaque
-        // ArgumentNullException from LINQ rather than an empty result or a clear error.
         _productRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IEnumerable<Product>)null!);
 
@@ -309,10 +290,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_ProductWithNullName_ThrowsNullReferenceException()
     {
-        // DEFECT: the supplier predicate defends with `?? string.Empty` but the name predicate
-        // dereferences p.Name directly. Product.Name is non-nullable in the domain, but
-        // Reconstruct() does not enforce it, so a legacy row with a NULL name takes the whole
-        // search down instead of simply not matching.
         GivenProducts(Reconstruct(null!, "SKU-001"));
 
         var act = async () => await _handler.Handle(new SearchProductsQuery("Wireless", null), CancellationToken.None);
@@ -331,8 +308,6 @@ public class SearchProductsQueryHandlerTests
 
         result.Should().ContainSingle().Which.Sku.Should().Be("SKU-002");
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_MaxLengthName_MatchesEmbeddedSubstringIntact()
@@ -370,9 +345,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_ArchivedProducts_AreIncludedInSearchResults()
     {
-        // GAP: unlike GetAllProductsQuery, which exposes an OnlyAvailable flag, SearchProductsQuery
-        // has no archived filter at all. Archived stock is returned to every caller with no way to
-        // opt out. Pinned as current behaviour, not endorsed as correct.
         GivenProducts(
             Reconstruct("Wireless Mouse", "SKU-001", archived: true),
             Reconstruct("Wireless Keyboard", "SKU-002"));
@@ -386,10 +358,7 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_AccentedName_IsNotMatchedByUnaccentedTerm()
     {
-        // OrdinalIgnoreCase folds ASCII case only -- it does no Unicode normalisation. Searching
-        // "Cafe" will never find "Café", so international product names are effectively
-        // unsearchable unless the operator types the exact accented form.
-        GivenProducts(MakeProduct("Café Latte Syrup", "SKU-001", "Acme"));
+        GivenProducts(MakeProduct("Cafأ© Latte Syrup", "SKU-001", "Acme"));
 
         var result = await _handler.Handle(new SearchProductsQuery("Cafe", null), CancellationToken.None);
 
@@ -423,9 +392,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_AlreadyCancelledToken_CompletesInsteadOfThrowing()
     {
-        // DEFECT: the token is handed to the repository but never observed by the handler itself.
-        // Filtering and mapping a large result set therefore runs to completion after the caller
-        // has given up. There is no ThrowIfCancellationRequested between fetch and projection.
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         GivenProducts(MakeProduct("Wireless Mouse", "SKU-001", "Acme"));
@@ -438,7 +404,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_ExpiredProduct_StillAppearsInResults()
     {
-        // Search applies no expiry filter, so long-expired stock is returned alongside live stock.
         GivenProducts(Reconstruct("Wireless Mouse", "SKU-001", expiryDate: new DateTime(2000, 1, 1)));
 
         var result = await _handler.Handle(new SearchProductsQuery("Wireless", null), CancellationToken.None);
@@ -449,8 +414,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_UtcTimestamps_ArePassedThroughWithoutNormalisation()
     {
-        // 23:30 UTC on 1 March is already 2 March in UTC+03:00. The handler neither converts nor
-        // tags the value, so the calendar day a client renders depends entirely on its own zone.
         var expiry = new DateTime(2026, 3, 1, 23, 30, 0, DateTimeKind.Utc);
         GivenProducts(Reconstruct("Wireless Mouse", "SKU-001", expiryDate: expiry));
 
@@ -467,11 +430,6 @@ public class SearchProductsQueryHandlerTests
     [Fact]
     public async Task Handle_NeverUpdatedProduct_CollapsesNullLastUpdatedAtToDateTimeMinValue()
     {
-        // DEFECT: Product.LastUpdatedAt is DateTime? but ProductViewModel.LastUpdatedAt is a
-        // non-nullable DateTime, so AutoMapper maps "never updated" to 0001-01-01T00:00:00.
-        // That value is not merely misleading -- it sits on the lower boundary of DateTime, so a
-        // client east of Greenwich that tags it with its own offset throws rather than rendering:
-        // the implied UTC instant (local minus a positive offset) falls before DateTime.MinValue.
         GivenProducts(Reconstruct("Wireless Mouse", "SKU-001", lastUpdatedAt: null));
 
         var result = await HandlerWithRealMapper()

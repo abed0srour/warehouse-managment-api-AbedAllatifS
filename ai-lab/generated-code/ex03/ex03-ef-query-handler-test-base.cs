@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Warehouse.Application;
@@ -7,16 +7,6 @@ using Warehouse.Infrastructure.Mapping;
 
 namespace Warehouse.Api.UnitTests.Queries;
 
-/// <summary>
-/// Shared fixture for the five query handlers that talk to <see cref="WarehouseDbContext"/>
-/// directly instead of going through a repository interface, so they cannot be mocked.
-///
-/// These run against the EF Core InMemory provider. That exercises the handler's own logic
-/// (filtering, ordering, paging arithmetic, grouping keys) but NOT SQL translation --
-/// InMemory evaluates everything client-side, so a LINQ shape that Npgsql cannot translate
-/// will still pass here. Translation is covered by the integration test project against a
-/// real database.
-/// </summary>
 public abstract class EfQueryHandlerTestBase : IDisposable
 {
     protected WarehouseDbContext Context { get; }

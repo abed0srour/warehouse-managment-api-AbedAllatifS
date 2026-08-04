@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Warehouse.Application.Products.Queries;
 using Warehouse.Infrastructure.Queries;
 
@@ -10,8 +10,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
 
     private static DateTime Unspecified(int year, int month, int day, int hour = 0, int minute = 0, int second = 0) =>
         DateTime.SpecifyKind(new DateTime(year, month, day, hour, minute, second), DateTimeKind.Unspecified);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_GroupsByYearAndCountry()
@@ -81,8 +79,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
         vm.QuantityInStock.Should().Be(7);
     }
 
-    // ---------- negative ----------
-
     [Fact]
     public async Task Handle_EmptyDatabase_ReturnsNoGroups()
     {
@@ -96,8 +92,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
     [Fact]
     public async Task Handle_ProductWithoutSupplier_IsExcluded()
     {
-        // Requires BOTH an expiry date and a supplier. An unassigned product silently
-        // vanishes from this report even though it has an expiry date.
         await SeedAsync(MakeProduct("Orphan", "SKU-0001", supplierId: null, expiryDate: Unspecified(2025, 3, 1)));
 
         var result = await CreateHandler().Handle(
@@ -123,8 +117,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
     [Fact]
     public async Task Handle_DanglingSupplierId_IsExcluded()
     {
-        // A SupplierId pointing at a row that does not exist leaves the navigation null,
-        // so the product drops out rather than surfacing as an error.
         await SeedAsync(MakeProduct("Dangling", "SKU-0001",
             supplierId: Guid.NewGuid(), expiryDate: Unspecified(2025, 3, 1)));
 
@@ -148,8 +140,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
         await act.Should().ThrowAsync<ObjectDisposedException>();
     }
 
-    // ---------- edge cases ----------
-
     [Fact]
     public async Task Handle_YearBoundary_SplitsGroupsWithinSameCountry()
     {
@@ -172,8 +162,6 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
     [Fact]
     public async Task Handle_CountryComparisonIsCaseSensitive()
     {
-        // "US" and "us" produce two separate groups. Nothing normalises supplier country,
-        // so inconsistent data fragments the report.
         var upper = MakeSupplier("Acme", "US");
         var lower = MakeSupplier("Globex", "us");
         await SeedAsync(upper, lower,
@@ -190,7 +178,7 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
     [Fact]
     public async Task Handle_UnicodeCountryName_FormsItsOwnGroup()
     {
-        var supplier = MakeSupplier("Abidjan Foods", "Côte d'Ivoire");
+        var supplier = MakeSupplier("Abidjan Foods", "Cأ´te d'Ivoire");
         await SeedAsync(supplier,
             MakeProduct("Cocoa", "SKU-0001", supplierId: supplier.SupplierId, expiryDate: Unspecified(2025, 3, 1)));
 
@@ -198,7 +186,7 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
             new GetProductsGroupedByExpiryAndCountryQuery(),
             CancellationToken.None);
 
-        result.Single().Country.Should().Be("Côte d'Ivoire");
+        result.Single().Country.Should().Be("Cأ´te d'Ivoire");
     }
 
     [Fact]
@@ -246,7 +234,7 @@ public class GetProductsGroupedByExpiryAndCountryQueryHandlerTests : EfQueryHand
             new GetProductsGroupedByExpiryAndCountryQuery(),
             CancellationToken.None);
 
-        result.Should().HaveCount(12); // 3 countries x 4 years
+        result.Should().HaveCount(12);
         result.Should().OnlyContain(g => g.TotalProducts == 1);
     }
 }

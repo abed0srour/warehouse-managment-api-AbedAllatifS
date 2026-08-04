@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using AutoMapper;
 using FluentAssertions;
@@ -19,9 +19,7 @@ public class GetAllProductsQueryHandlerTests
 
     public GetAllProductsQueryHandlerTests()
     {
-        // Default to a cache MISS. Moq's default for byte[] is an empty array rather than
-        // null, and GetStringAsync only null-checks -- so without this the handler would
-        // receive "" and fail to deserialize it. See Handle_ZeroLengthCacheEntry_Throws.
+
         _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
@@ -63,8 +61,6 @@ public class GetAllProductsQueryHandlerTests
 
     private void GivenProducts(params Product[] products) =>
         _productRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(products);
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_NoFilter_ReturnsAllProducts()
@@ -153,8 +149,6 @@ public class GetAllProductsQueryHandlerTests
         _cache.Verify(c => c.GetAsync("products:all:False", It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    // ---------- negative ----------
-
     [Fact]
     public async Task Handle_EmptyRepository_ReturnsEmptyCollection()
     {
@@ -189,8 +183,6 @@ public class GetAllProductsQueryHandlerTests
     [Fact]
     public async Task Handle_CacheReadThrows_PropagatesException()
     {
-        // Infrastructure failure: Redis down on read. The handler has no try/catch,
-        // so a cache outage takes the whole query down rather than degrading to the repository.
         _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("redis unavailable"));
 
@@ -225,8 +217,6 @@ public class GetAllProductsQueryHandlerTests
 
         await act.Should().ThrowAsync<JsonException>();
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_MaxLengthProductName_IsPreservedIntact()
@@ -278,10 +268,6 @@ public class GetAllProductsQueryHandlerTests
     [Fact]
     public async Task Handle_ZeroLengthCacheEntry_ThrowsInsteadOfFallingBack()
     {
-        // DEFECT: GetStringAsync only treats a NULL byte[] as a miss. A zero-length entry
-        // -- which a truncated or evicted-mid-write Redis value can produce -- decodes to
-        // "" and blows up in the deserializer, turning a degraded cache into a hard 500
-        // instead of a fall-through to the repository.
         GivenProducts(MakeProduct("Mouse", "SKU-001"));
         _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<byte>());

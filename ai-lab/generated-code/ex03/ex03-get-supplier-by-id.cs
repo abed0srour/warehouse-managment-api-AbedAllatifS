@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using FluentAssertions;
 using Moq;
 using Warehouse.Application.Suppliers;
@@ -28,8 +28,6 @@ public class GetSupplierByIdQueryHandlerTests
 
         _handler = new GetSupplierByIdQueryHandler(_supplierRepository.Object, _mapper.Object);
     }
-
-    // ---------- positive ----------
 
     [Fact]
     public async Task Handle_ExistingSupplier_ReturnsMappedViewModel()
@@ -70,8 +68,6 @@ public class GetSupplierByIdQueryHandlerTests
 
         _supplierRepository.Verify(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()), Times.Once);
     }
-
-    // ---------- negative ----------
 
     [Fact]
     public async Task Handle_MissingSupplier_ReturnsNull()
@@ -127,8 +123,6 @@ public class GetSupplierByIdQueryHandlerTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
-
-    // ---------- edge cases ----------
 
     [Fact]
     public async Task Handle_MaxLengthContactEmail_IsPreservedIntact()
