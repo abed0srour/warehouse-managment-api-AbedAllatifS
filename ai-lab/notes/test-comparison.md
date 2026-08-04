@@ -1,0 +1,1 @@
+The tests weren't perfect on the first try — 23 failed initially because of a wrong assumption about how the cache mock behaves. Claude Code caught it, fixed it, and turned it into a proper test instead of hiding it.
