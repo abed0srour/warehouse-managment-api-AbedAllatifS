@@ -98,6 +98,34 @@ public class Product
         LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 
+    /// <summary>
+    /// Applies a signed delta to the stock level: positive to receive stock, negative to issue it.
+    /// Unlike <see cref="UpdateQuantity"/>, which overwrites, this is relative -- so two concurrent
+    /// receipts of 10 add 20 rather than one silently discarding the other.
+    /// </summary>
+    public void AdjustStock(int quantityChange)
+    {
+        if (IsArchived)
+            throw new InvalidOperationException("Archived products cannot be updated.");
+
+        if (quantityChange == 0)
+            throw new ArgumentException("Stock adjustment cannot be zero.");
+
+        // Widened before the add: QuantityInStock + int.MaxValue would otherwise wrap to a
+        // negative number and slip past the check below.
+        var newQuantity = (long)QuantityInStock + quantityChange;
+
+        if (newQuantity < 0)
+            throw new InvalidOperationException(
+                $"Cannot decrease stock by {Math.Abs((long)quantityChange)}: only {QuantityInStock} in stock.");
+
+        if (newQuantity > int.MaxValue)
+            throw new InvalidOperationException("Resulting stock quantity is too large.");
+
+        QuantityInStock = (int)newQuantity;
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+    }
+
     public void Archive()
     {
         IsArchived = true;
