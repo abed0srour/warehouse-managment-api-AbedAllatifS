@@ -49,7 +49,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
-
     public WarehouseDbContext CreateDbContext() =>
         Services.GetRequiredService<IDbContextFactory<WarehouseDbContext>>().CreateDbContext();
 

@@ -30,7 +30,6 @@ public class CreateProductEndpointTests : IClassFixture<CustomWebApplicationFact
 
     private static string NewSku() => $"SKU-{Guid.NewGuid():N}".Substring(0, 12);
 
-
     [Fact]
     public async Task POST_ValidProduct_Returns201()
     {
@@ -83,7 +82,6 @@ public class CreateProductEndpointTests : IClassFixture<CustomWebApplicationFact
         values!.Single().Should().NotBeNullOrWhiteSpace();
     }
 
-
     [Fact]
     public async Task POST_ValidProduct_ResponseBodyMatchesWhatWasSent()
     {
@@ -126,7 +124,6 @@ public class CreateProductEndpointTests : IClassFixture<CustomWebApplicationFact
         firstDoc.RootElement.GetProperty("id").GetGuid()
             .Should().NotBe(secondDoc.RootElement.GetProperty("id").GetGuid());
     }
-
 
     [Fact]
     public async Task POST_ValidProduct_PersistsRowToDatabase()
@@ -222,7 +219,6 @@ public class CreateProductEndpointTests : IClassFixture<CustomWebApplicationFact
         var products = await listResponse.Content.ReadFromJsonAsync<List<ProductViewModel>>();
         products.Should().Contain(p => p.Sku == sku);
     }
-
 
     [Fact]
     public async Task POST_DuplicateSku_Returns409()

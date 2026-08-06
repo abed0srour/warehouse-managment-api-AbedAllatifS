@@ -8,7 +8,6 @@ using WarehouseManagement.Api.Contracts;
 
 namespace Warehouse.Api.IntegrationTests.Images;
 
-
 public class UploadProductImageEndpointTests : IClassFixture<CustomWebApplicationFactory>, IDisposable
 {
     private readonly CustomWebApplicationFactory _factory;
@@ -55,7 +54,6 @@ public class UploadProductImageEndpointTests : IClassFixture<CustomWebApplicatio
         return document.RootElement.GetProperty("id").GetGuid();
     }
 
-
     [Fact]
     public async Task POST_Image_ValidJpg_Returns200()
     {
@@ -99,7 +97,6 @@ public class UploadProductImageEndpointTests : IClassFixture<CustomWebApplicatio
 
         response.Headers.GetValues("X-Correlation-Id").Should().ContainSingle().Which.Should().Be(correlationId);
     }
-
 
     [Fact]
     public async Task POST_Image_WritesFileToDisk()
@@ -208,7 +205,6 @@ public class UploadProductImageEndpointTests : IClassFixture<CustomWebApplicatio
         var product = await after.Products.AsNoTracking().SingleAsync(p => p.Id == id);
         product.LastUpdatedAt.Should().BeNull();
     }
-
 
     [Fact]
     public async Task POST_Image_UnknownProduct_Returns404()

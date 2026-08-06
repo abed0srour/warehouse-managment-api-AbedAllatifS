@@ -59,7 +59,6 @@ public class DeleteProductEndpointTests : IClassFixture<CustomWebApplicationFact
         return path;
     }
 
-
     [Fact]
     public async Task DELETE_ExistingProduct_Returns204()
     {
@@ -93,11 +92,9 @@ public class DeleteProductEndpointTests : IClassFixture<CustomWebApplicationFact
         response.Headers.GetValues("X-Correlation-Id").Should().ContainSingle().Which.Should().Be(correlationId);
     }
 
-
     [Fact]
     public async Task DELETE_ExistingProduct_DoesNotRemoveTheRow()
     {
-        // The row survives. "DELETE" here means archive.
         var id = await CreateProductAsync();
 
         await _client.DeleteAsync($"/api/products/{id}");
@@ -168,7 +165,6 @@ public class DeleteProductEndpointTests : IClassFixture<CustomWebApplicationFact
         (await after.Products.AsNoTracking().CountAsync()).Should().Be(before);
     }
 
-
     [Fact]
     public async Task GET_ById_AfterDelete_StillReturns200WithArchivedFlag()
     {
@@ -206,7 +202,6 @@ public class DeleteProductEndpointTests : IClassFixture<CustomWebApplicationFact
         var products = await response.Content.ReadFromJsonAsync<List<ProductViewModel>>();
         products.Should().Contain(p => p.Id == id);
     }
-
 
     [Fact]
     public async Task DELETE_Product_LeavesUploadedImageFileOnDisk()
@@ -257,7 +252,6 @@ public class DeleteProductEndpointTests : IClassFixture<CustomWebApplicationFact
         supplier.IsActive.Should().BeTrue();
         supplier.Name.Should().Be("Acme Corp");
     }
-
 
     [Fact]
     public async Task DELETE_UnknownProduct_Returns404()
