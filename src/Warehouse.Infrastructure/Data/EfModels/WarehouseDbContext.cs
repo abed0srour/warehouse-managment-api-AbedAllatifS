@@ -33,7 +33,11 @@ public partial class WarehouseDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=WarehouseDbCodeFirst;Username=postgres;Password=postgres");
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                ?? throw new InvalidOperationException(
+                    "ConnectionStrings__DefaultConnection is not set. Required for design-time tooling (e.g. dotnet ef) when no DI-configured options are supplied.");
+
+            optionsBuilder.UseNpgsql(connectionString);
         }
     }
 

@@ -52,8 +52,3 @@ both main warehouse project and the notifications service (Warehouse.Notificatio
 warehouse API publishes integration events to RabbitMQ
 
 # Session 9
-Added unit tests and integration tests for the warehouse API
-Two new test projects: Warehouse.Api.UnitTests and Warehouse.Api.IntegrationTests
-Unit tests mock the repos with Moq — product/supplier handlers, file upload validation
-CustomWebApplicationFactory boots the real API with an in-memory database instead of Postgres
-Integration tests hit real endpoints — products, suppliers, image upload, plus a full end-to-end flow

@@ -10,6 +10,9 @@ using Warehouse.Infrastructure.Repositories;
 using Warehouse.Infrastructure.Storage;
 using Serilog;
 using Minio;
+using Warehouse.Infrastructure.Messaging;
+using Warehouse.Infrastructure.Notifications;
+using Warehouse.Domain.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -32,6 +35,8 @@ Log.Logger = new LoggerConfiguration()
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
     .Enrich.FromLogContext()
     .CreateLogger();
+
+LoadEnvFile();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,10 +66,7 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT"
     });
 
-    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
-    });
+    options.OperationFilter<AuthorizeCheckOperationFilter>();
 });
 
 
@@ -82,11 +84,8 @@ builder.Services.AddAutoMapper(
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
-builder.Services.AddScoped<IShipmentRepository, ShipmentRepository>();
-
-// Supplier notifications go to the log for now; swap this line for an SMTP or webhook
-// implementation and nothing in the application layer changes.
-builder.Services.AddScoped<ISupplierNotificationService, LoggingSupplierNotificationService>();
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 
 builder.Services.AddMinio(configureClient => configureClient
     .WithEndpoint(builder.Configuration["MinIO:Endpoint"])
@@ -96,6 +95,16 @@ builder.Services.AddMinio(configureClient => configureClient
 
 builder.Services.AddScoped<IFileStorageService, MinioStorageService>();
 builder.Services.AddScoped<IWarehouseFileRepository, WarehouseFileRepository>();
+
+builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>(client =>
+{
+    var baseUrl = builder.Configuration["NotificationService:BaseUrl"]
+        ?? throw new InvalidOperationException("NotificationService:BaseUrl is not configured.");
+    var timeoutSeconds = builder.Configuration.GetValue<int?>("NotificationService:TimeoutSeconds") ?? 3;
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+});
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -261,4 +270,40 @@ finally
     Log.CloseAndFlush();
 }
 
-public partial class Program { }
+static void LoadEnvFile()
+{
+    var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+    while (directory is not null && !File.Exists(Path.Combine(directory.FullName, ".env")))
+    {
+        directory = directory.Parent;
+    }
+
+    if (directory is null)
+    {
+        return;
+    }
+
+    foreach (var line in File.ReadAllLines(Path.Combine(directory.FullName, ".env")))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+        {
+            continue;
+        }
+
+        var separatorIndex = trimmed.IndexOf('=');
+        if (separatorIndex <= 0)
+        {
+            continue;
+        }
+
+        var key = trimmed[..separatorIndex].Trim();
+        var value = trimmed[(separatorIndex + 1)..].Trim();
+
+        if (Environment.GetEnvironmentVariable(key) is null)
+        {
+            Environment.SetEnvironmentVariable(key, value);
+        }
+    }
+}
