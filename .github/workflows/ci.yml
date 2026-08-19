@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'session-*'
+  pull_request:
+    branches:
+      - main
+      - 'session-*'
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  SOLUTION: WarehouseManagement.sln
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Every project in the solution targets net8.0.
+      - name: Set up the .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      # The integration tests boot the real Program.cs through WebApplicationFactory, and
+      # Program.cs calls FirebaseApp.Create with the file named by Firebase:ServiceAccountPath.
+      # That file is gitignored (.gitignore: *firebase-adminsdk*.json), so a fresh clone does
+      # not have it and every integration test would fail at host startup.
+      #
+      # It has to exist before `dotnet build`, because the Web SDK copies it to the output
+      # directory and the test host resolves the path relative to its own working directory.
+      #
+      # The tests never validate a real Firebase token -- TestAuthHandler replaces the auth
+      # scheme entirely -- so a syntactically valid key is all the host needs to start. Set the
+      # FIREBASE_SERVICE_ACCOUNT secret to use real credentials instead.
+      - name: Provision Firebase service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          target="src/Warehouse.Presentation/firebase-adminsdk.json"
+
+          if [ -n "${FIREBASE_SERVICE_ACCOUNT:-}" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$target"
+            echo "Wrote credentials from the FIREBASE_SERVICE_ACCOUNT secret."
+          else
+            echo "FIREBASE_SERVICE_ACCOUNT is not set; generating a throwaway key for this run."
+            openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${RUNNER_TEMP}/ci-key.pem" 2>/dev/null
+            # A PEM contains no quotes or backslashes, so folding the newlines into literal
+            # \n is a complete JSON escape -- and avoids depending on jq being installed.
+            private_key=$(awk 'BEGIN { ORS = "\\n" } { print }' "${RUNNER_TEMP}/ci-key.pem")
+            cat > "$target" <<EOF
+          {
+            "type": "service_account",
+            "project_id": "warehousemanagmenet",
+            "private_key_id": "ci-placeholder",
+            "private_key": "${private_key}",
+            "client_email": "ci@warehousemanagmenet.iam.gserviceaccount.com",
+            "client_id": "000000000000000000000",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+          }
+          EOF
+            rm -f "${RUNNER_TEMP}/ci-key.pem"
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build
+        run: dotnet build "$SOLUTION" --configuration "$BUILD_CONFIGURATION" --no-restore
+
+      # --no-build so a compilation error surfaces in the Build step above rather than here.
+      - name: Run tests
+        run: >
+          dotnet test "$SOLUTION"
+          --configuration "$BUILD_CONFIGURATION"
+          --no-build
+          --verbosity normal
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 14

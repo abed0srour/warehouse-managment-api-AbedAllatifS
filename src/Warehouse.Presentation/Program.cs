@@ -5,6 +5,7 @@ using System.Globalization;
 using Warehouse.Presentation.Filters;
 using Warehouse.Presentation.Middleware;
 using Warehouse.Domain;
+using Warehouse.Infrastructure.Notifications;
 using Warehouse.Infrastructure.Repositories;
 using Warehouse.Infrastructure.Storage;
 using Serilog;
@@ -23,6 +24,7 @@ using Google.Apis.Auth.OAuth2;
 using WarehouseDbContext = Warehouse.Infrastructure.Data.EfModels.WarehouseDbContext;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Reflection;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -47,6 +49,13 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    // Pulls the /// summaries, remarks and <response> codes off the controllers.
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme.",

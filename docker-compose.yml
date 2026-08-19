@@ -1,6 +1,48 @@
 services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: WarehouseDbCodeFirst
+    ports:
+      - "5500:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d WarehouseDbCodeFirst"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+
+  redis-db:
+    image: redis:alpine
+    container_name: redis-db
+    restart: always
+    ports:
+      - "6380:6379"
+    networks:
+      - cache-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: warehouse-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - msg-net
+
   minio:
     image: minio/minio
+    container_name: warehousemanagement-minio-1
+    restart: always
+    command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -8,8 +50,50 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
-      - minio_data:/data
-    command: server /data --console-address ':9001'
+      - miniodata:/data
+    networks:
+      - storage-net
+
+  warehouse-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: warehouse-api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=WarehouseDbCodeFirst;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis-db:6379
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-db:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_started
+    networks:
+      - api-net
+      - db-net
+      - cache-net
+      - msg-net
+      - storage-net
 
 volumes:
-  minio_data:
+  pgdata:
+  miniodata:
+
+networks:
+  api-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+  cache-net:
+    driver: bridge
+  msg-net:
+    driver: bridge
+  storage-net:
+    driver: bridge

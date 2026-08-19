@@ -11,6 +11,7 @@ using Warehouse.Domain;
 using Warehouse.Application.Products.Commands;
 using Warehouse.Application.Products.Queries;
 using WarehouseManagement.Api.Contracts;
+using Warehouse.Presentation.Contracts;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Warehouse.Presentation.Controllers;
@@ -74,7 +75,24 @@ public class ProductsController : ControllerBase
         return Ok(products);
     }
 
-    // 4. POST /api/products
+    /// <summary>Lists every product that has run down to zero stock.</summary>
+    /// <remarks>
+    /// Archived products are excluded — they are not restockable, so they would be noise on a
+    /// reorder list. Results are ordered by product name.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token bound to the request.</param>
+    /// <response code="200">The out-of-stock products, or an empty array when everything is in stock.</response>
+    // 4. GET /api/products/out-of-stock
+    [Authorize(Policy = "AuthenticatedUser")]
+    [HttpGet("out-of-stock")]
+    [ProducesResponseType(typeof(IEnumerable<OutOfStockProductDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<OutOfStockProductDto>>> GetOutOfStock(CancellationToken cancellationToken)
+    {
+        var products = await _mediator.Send(new GetOutOfStockProductsQuery(), cancellationToken);
+        return Ok(products);
+    }
+
+    // 5. POST /api/products
     [Authorize(Policy = "AdminOnly")]
     [HttpPost]
     public async Task<ActionResult<Product>> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
@@ -201,7 +219,69 @@ public class ProductsController : ControllerBase
         return Ok(new { message = "Image uploaded successfully.", path = $"/uploads/{fileName}" });
     }
 
-    // 8. DELETE /api/products/{id} - soft delete
+    /// <summary>Receives stock into, or issues stock out of, a product.</summary>
+    /// <remarks>
+    /// The adjustment is relative, not absolute: two concurrent receipts of 10 add 20, where
+    /// <c>POST /api/products/{id}/quantity</c> overwrites and would lose one of them.
+    ///
+    /// A decrease that would take the level below zero is rejected as a conflict rather than
+    /// clamped, and a reason is mandatory on any decrease.
+    ///
+    /// Sample request:
+    ///
+    ///     POST /api/products/stock-adjustments
+    ///     {
+    ///        "productId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///        "type": "Decrease",
+    ///        "quantity": 5,
+    ///        "reason": "Damaged in transit"
+    ///     }
+    ///
+    /// </remarks>
+    /// <param name="request">The product, direction, magnitude and reason for the adjustment.</param>
+    /// <param name="cancellationToken">Cancellation token bound to the request.</param>
+    /// <response code="200">The adjustment was applied; returns the product at its new level.</response>
+    /// <response code="400">The payload failed validation, or the adjustment was zero.</response>
+    /// <response code="404">No product exists with the supplied identifier.</response>
+    /// <response code="409">The product is archived, or the decrease exceeds the stock on hand.</response>
+    // 8. POST /api/products/stock-adjustments
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPost("stock-adjustments")]
+    [ProducesResponseType(typeof(ProductViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ProductViewModel>> AdjustStock(
+        [FromBody] CreateStockAdjustmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        // The contract carries an unsigned magnitude plus a direction; the command takes a
+        // signed delta. Translating here keeps the sign convention out of the domain.
+        var quantityChange = request.Type == AdjustmentType.Decrease
+            ? -request.Quantity
+            : request.Quantity;
+
+        var result = await _mediator.Send(
+            new AdjustStockCommand(request.ProductId, quantityChange, request.Reason),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return result.Error!.Type switch
+            {
+                ErrorType.NotFound => NotFound(new { message = result.Error.Message }),
+                ErrorType.Conflict => Conflict(new { message = result.Error.Message }),
+                _ => BadRequest(new { message = result.Error.Message })
+            };
+        }
+
+        _logger.LogInformation(
+            "Product {ProductId} stock adjusted to {Quantity}", request.ProductId, result.Value!.QuantityInStock);
+
+        return Ok(result.Value);
+    }
+
+    // 9. DELETE /api/products/{id} - soft delete
     [Authorize(Policy = "AdminOnly")] 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

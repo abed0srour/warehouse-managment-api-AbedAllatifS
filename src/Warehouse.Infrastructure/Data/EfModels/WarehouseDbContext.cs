@@ -19,6 +19,12 @@ public partial class WarehouseDbContext : DbContext
 
     public virtual DbSet<Productimage> Productimages { get; set; }
 
+    public virtual DbSet<Shipment> Shipments { get; set; }
+
+    public virtual DbSet<ShipmentLine> ShipmentLines { get; set; }
+
+    public virtual DbSet<ShipmentStatusChange> ShipmentStatusChanges { get; set; }
+
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
     public virtual DbSet<WarehouseFile> WarehouseFiles { get; set; }
@@ -76,6 +82,78 @@ public partial class WarehouseDbContext : DbContext
             entity.HasOne(d => d.Product).WithMany(p => p.Productimages)
                 .HasForeignKey(d => d.ProductId)
                 .HasConstraintName("Productimages_ProductId_fkey");
+        });
+
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Shipments_pkey");
+
+            entity.HasIndex(e => e.ReferenceNumber, "Shipments_ReferenceNumber_key").IsUnique();
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.ReferenceNumber).HasMaxLength(50);
+            entity.Property(e => e.SupplierName).HasMaxLength(255);
+            entity.Property(e => e.Status).HasMaxLength(40);
+            entity.Property(e => e.DestinationLine1).HasMaxLength(255);
+            entity.Property(e => e.DestinationCity).HasMaxLength(120);
+            entity.Property(e => e.DestinationPostalCode).HasMaxLength(20);
+            entity.Property(e => e.DestinationCountry).HasMaxLength(100);
+            entity.Property(e => e.TrackingNumber).HasMaxLength(100);
+            entity.Property(e => e.ExpectedDeliveryDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.DispatchedAt).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.DeliveredAt).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.SupplierNotifiedAt).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone");
+            entity.Property(e => e.LastUpdatedAt).HasColumnType("timestamp without time zone");
+
+            entity.HasOne(d => d.Supplier).WithMany()
+                .HasForeignKey(d => d.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("Shipments_SupplierId_fkey");
+        });
+
+        modelBuilder.Entity<ShipmentLine>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ShipmentLines_pkey");
+
+            // One line per product per shipment: AssignProduct tops up an existing line
+            // instead of adding a second one, and the database enforces the same thing.
+            entity.HasIndex(e => new { e.ShipmentId, e.ProductId }, "ShipmentLines_ShipmentId_ProductId_key").IsUnique();
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.Sku).HasMaxLength(100);
+            entity.Property(e => e.Quantity).ValueGeneratedNever();
+
+            entity.HasOne(d => d.Shipment).WithMany(p => p.Lines)
+                .HasForeignKey(d => d.ShipmentId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ShipmentLines_ShipmentId_fkey");
+
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("ShipmentLines_ProductId_fkey");
+        });
+
+        modelBuilder.Entity<ShipmentStatusChange>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ShipmentStatusChanges_pkey");
+
+            entity.HasIndex(e => new { e.ShipmentId, e.OccurredAt }, "ShipmentStatusChanges_ShipmentId_OccurredAt_idx");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.FromStatus).HasMaxLength(40);
+            entity.Property(e => e.ToStatus).HasMaxLength(40);
+            entity.Property(e => e.Note).HasMaxLength(500);
+            entity.Property(e => e.OccurredAt).HasColumnType("timestamp without time zone");
+
+            entity.HasOne(d => d.Shipment).WithMany(p => p.StatusHistory)
+                .HasForeignKey(d => d.ShipmentId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ShipmentStatusChanges_ShipmentId_fkey");
         });
 
         modelBuilder.Entity<Supplier>(entity =>

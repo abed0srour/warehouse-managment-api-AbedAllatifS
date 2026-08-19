@@ -49,6 +49,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
+    /// <summary>
+    /// Opens a context over the same in-memory database the application under test is using,
+    /// so a test can assert on persisted side effects rather than only on the HTTP response.
+    /// The caller owns the returned context and should dispose it.
+    /// </summary>
+    public WarehouseDbContext CreateDbContext() =>
+        Services.GetRequiredService<IDbContextFactory<WarehouseDbContext>>().CreateDbContext();
+
     private void SeedTestData(WarehouseDbContext context)
     {
         context.Database.EnsureCreated();

@@ -29,6 +29,22 @@ public class ProductRepository : IProductRepository
         return entity == null ? null : ToDomain(entity);
     }
 
+    public async Task<IReadOnlyList<Product>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<Product>();
+        }
+
+        var entities = await _context.Products
+            .AsNoTracking()
+            .Where(p => idList.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(ToDomain).ToList();
+    }
+
     public async Task<IEnumerable<Product>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var entities = await _context.Products.AsNoTracking().ToListAsync(cancellationToken);
