@@ -189,10 +189,13 @@ builder.Services.AddAuthorization(options =>
 var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountPath"]
     ?? throw new InvalidOperationException("Firebase:ServiceAccountPath is not configured.");
 
-FirebaseApp.Create(new AppOptions
+if (FirebaseApp.DefaultInstance == null)
 {
-    Credential = CredentialFactory.FromFile<ServiceAccountCredential>(firebaseServiceAccountPath).ToGoogleCredential()
-});
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = CredentialFactory.FromFile<ServiceAccountCredential>(firebaseServiceAccountPath).ToGoogleCredential()
+    });
+}
 
 var app = builder.Build();
 
