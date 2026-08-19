@@ -8,6 +8,9 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Define repository secrets as job-level environment variables
+    env:
+      DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       - name: Checkout repository
@@ -29,5 +32,5 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }}
+            ${{ env.DOCKER_USER }}/my-app:latest
+            ${{ env.DOCKER_USER }}/my-app:${{ github.sha }}
